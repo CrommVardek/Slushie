@@ -1,13 +1,16 @@
 use hex_literal::hex;
 use ink_env::hash::{Blake2x256, CryptoHash};
 use ink_primitives::KeyPtr;
-use ink_storage::traits::{ExtKeyPtr, PackedLayout, SpreadLayout, StorageLayout};
+use ink_storage::traits::{ExtKeyPtr, PackedLayout, SpreadAllocate, SpreadLayout, StorageLayout};
 
 /// Merkle tree maximum depth
 pub const MAX_DEPTH: usize = 32;
 
+/// Merkle tree history size
+pub const DEFAULT_ROOT_HISTORY_SIZE: usize = 100;
+
 ///Merkle tree with history for storing commitments in it
-#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadLayout, PartialEq)]
+#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadLayout, SpreadAllocate, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug, StorageLayout))]
 pub(crate) struct MerkleTree<
     const DEPTH: usize,
@@ -126,7 +129,7 @@ pub(crate) enum MerkleTreeError {
     DepthIsZero,
 }
 
-#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadLayout, PartialEq)]
+#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadLayout, SpreadAllocate, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Array<T: Default + Clone + Copy, const N: usize>([T; N]);
 
