@@ -1,11 +1,11 @@
 use dusk_bls12_381::BlsScalar;
 use hex_literal::hex;
 use ink_env::hash::{Blake2x256, CryptoHash, HashOutput};
-use ink_storage::traits::{PackedLayout, SpreadLayout, StorageLayout};
+use ink_storage::traits::{PackedLayout, SpreadAllocate, SpreadLayout, StorageLayout};
 
 use super::merkle_tree::MAX_DEPTH;
 
-#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadLayout, PartialEq)]
+#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadAllocate, SpreadLayout, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug, ink_storage::traits::StorageLayout))]
 pub struct Blake;
 
@@ -56,7 +56,7 @@ impl MerkleTreeHasher for Blake {
     ];
 }
 
-#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadLayout, PartialEq)]
+#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadAllocate, SpreadLayout, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug, ink_storage::traits::StorageLayout))]
 pub struct Poseidon;
 
@@ -146,12 +146,13 @@ impl MerkleTreeHasher for Poseidon {
 ///Trait which require implementation hash for subtrees, MAX_DEPTH zero elements, and hash output
 #[cfg(feature = "std")]
 pub trait MerkleTreeHasher:
-    scale::Encode + scale::Decode + PackedLayout + SpreadLayout + StorageLayout
+    scale::Encode + scale::Decode + PackedLayout + SpreadAllocate + SpreadLayout + StorageLayout
 {
     type Output: 'static
         + scale::Encode
         + scale::Decode
         + PackedLayout
+        + SpreadAllocate
         + SpreadLayout
         + StorageLayout
         + scale_info::TypeInfo
@@ -169,10 +170,11 @@ pub trait MerkleTreeHasher:
 
 ///Trait which require implementation hash for subtrees, MAX_DEPTH zero elements, and hash output
 #[cfg(not(feature = "std"))]
-pub trait MerkleTreeHasher: scale::Encode + scale::Decode + PackedLayout + SpreadLayout {
+pub trait MerkleTreeHasher: scale::Encode + scale::Decode + PackedLayout + SpreadAllocate + SpreadLayout {
     type Output: scale::Encode
         + scale::Decode
         + PackedLayout
+        + SpreadAllocate
         + SpreadLayout
         + Clone
         + Copy

@@ -40,13 +40,14 @@ mod Slushie {
     use crate::tree::merkle_tree::{
         MerkleTree, MerkleTreeError, DEFAULT_ROOT_HISTORY_SIZE, MAX_DEPTH,
     };
+    use crate::tree::hasher::Poseidon;
 
     type PoseidonHash = [u8; 32];
 
     #[ink(storage)]
     #[derive(ink_storage::traits::SpreadAllocate)]
     pub struct Slushie {
-        merkle_tree: MerkleTree<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE>,
+        merkle_tree: MerkleTree<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>,
         deposit_size: Balance,
         used_nullifiers: ink_storage::Mapping<PoseidonHash, bool>,
     }
@@ -107,7 +108,7 @@ mod Slushie {
         pub fn new(deposit_size: Balance) -> Self {
             ink::utils::initialize_contract(|me: &mut Self| {
                 *me = Self {
-                    merkle_tree: MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE>::new().unwrap(),
+                    merkle_tree: MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new().unwrap(),
                     deposit_size,
                     used_nullifiers: Default::default(),
                 };
