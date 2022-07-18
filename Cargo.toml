@@ -1,5 +1,5 @@
 [package]
-name = "Slushie"
+name = "slushie"
 version = "0.1.0"
 authors = ["4IRE <info@4irelabs.com>"]
 edition = "2021"
@@ -21,7 +21,7 @@ dusk-poseidon = { version = "0.22.0", default-features = false }
 dusk-bls12_381 = {version = "0.8.0", default-features = false}
 
 [lib]
-name = "Slushie"
+name = "slushie"
 path = "lib.rs"
 crate-type = [
 	# Used for normal contract Wasm blobs.

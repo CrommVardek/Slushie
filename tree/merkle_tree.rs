@@ -1,11 +1,11 @@
-use hex_literal::hex;
-use ink_env::hash::{Blake2x256, CryptoHash};
+#[cfg(feature = "std")]
 use ink_primitives::KeyPtr;
-use ink_storage::traits::{ExtKeyPtr, PackedLayout, SpreadAllocate, SpreadLayout, StorageLayout};
+#[cfg(feature = "std")]
+use ink_storage::traits::{ExtKeyPtr, StorageLayout};
+use ink_storage::traits::{PackedLayout, SpreadAllocate, SpreadLayout};
 
 /// Merkle tree maximum depth
 pub const MAX_DEPTH: usize = 32;
-
 /// Merkle tree history size
 pub const DEFAULT_ROOT_HISTORY_SIZE: usize = 100;
 
@@ -161,9 +161,10 @@ impl<T: Default + Clone + Copy, const N: usize> Default for Array<T, N> {
     }
 }
 
-#[cfg(any(feature = "std", tests))]
+#[cfg(test)]
 mod tests {
     use dusk_bls12_381::BlsScalar;
+    use ink_env::hash::{Blake2x256, CryptoHash};
 
     use crate::tree::hasher::{Blake, Poseidon};
 

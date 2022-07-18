@@ -31,17 +31,16 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use ink_lang as ink;
-use hex_literal::hex;
 
 mod tree;
 
 #[ink::contract]
-mod Slushie {
+mod slushie {
     use super::*;
+    use crate::tree::hasher::Poseidon;
     use crate::tree::merkle_tree::{
         MerkleTree, MerkleTreeError, DEFAULT_ROOT_HISTORY_SIZE, MAX_DEPTH,
     };
-    use crate::tree::hasher::Poseidon;
 
     type PoseidonHash = [u8; 32];
 
@@ -109,7 +108,9 @@ mod Slushie {
         pub fn new(deposit_size: Balance) -> Self {
             ink::utils::initialize_contract(|me: &mut Self| {
                 *me = Self {
-                    merkle_tree: MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new().unwrap(),
+                    merkle_tree: MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new(
+                    )
+                    .unwrap(),
                     deposit_size,
                     used_nullifiers: Default::default(),
                 };
@@ -181,6 +182,7 @@ mod Slushie {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use hex_literal::hex;
 
         /// Imports `ink_lang` so we can use `#[ink::test]`.
         use ink_lang as ink;
@@ -190,7 +192,10 @@ mod Slushie {
             let slushie: Slushie = Slushie::new(13);
 
             assert_eq!(slushie.deposit_size, 13 as Balance);
-            assert_eq!(slushie.merkle_tree, MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new().unwrap());
+            assert_eq!(
+                slushie.merkle_tree,
+                MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new().unwrap()
+            );
         }
 
         /// can deposit funds with a proper `deposit_size`
@@ -198,7 +203,8 @@ mod Slushie {
         fn deposit_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let mut slushie: Slushie = Slushie::new(13);
-            let hash: PoseidonHash = hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+            let hash: PoseidonHash =
+                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             let initial_root_hash = slushie.get_root_hash();
 
@@ -218,12 +224,15 @@ mod Slushie {
             let deposit_size = 13;
             let invalid_deposit_size = 55;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash = hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+            let hash: PoseidonHash =
+                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             let initial_root_hash = slushie.get_root_hash();
 
             ink_env::test::set_caller::<Environment>(accounts.bob);
-            ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(invalid_deposit_size);
+            ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(
+                invalid_deposit_size,
+            );
             let res = slushie.deposit(hash);
             assert_eq!(res.unwrap_err(), Error::InvalidTransferredAmount);
 
@@ -242,7 +251,8 @@ mod Slushie {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let deposit_size: Balance = 13;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash = hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+            let hash: PoseidonHash =
+                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             ink_env::test::set_caller::<Environment>(accounts.alice);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
@@ -262,7 +272,8 @@ mod Slushie {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let deposit_size = 13;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash = hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+            let hash: PoseidonHash =
+                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             ink_env::test::set_caller::<Environment>(accounts.alice);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
@@ -282,14 +293,16 @@ mod Slushie {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let deposit_size = 13;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash = hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+            let hash: PoseidonHash =
+                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             ink_env::test::set_caller::<Environment>(accounts.alice);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
             let res = slushie.deposit(hash);
             assert!(res.is_ok());
 
-            let invalid_root_hash: PoseidonHash = hex!("0000000000000000 0000000000000000 0001020304050607 08090a0b0c0d0e0f");
+            let invalid_root_hash: PoseidonHash =
+                hex!("0000000000000000 0000000000000000 0001020304050607 08090a0b0c0d0e0f");
 
             let res = slushie.withdraw(hash, invalid_root_hash);
             assert_eq!(res.unwrap_err(), Error::UnknownRoot);
@@ -301,13 +314,13 @@ mod Slushie {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let deposit_size = 13;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash = hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+            let hash: PoseidonHash =
+                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             ink_env::test::set_caller::<Environment>(accounts.alice);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
             let res = slushie.deposit(hash);
             assert!(res.is_ok());
-
             let resulting_root_hash = slushie.get_root_hash();
 
             let res = slushie.withdraw(hash, resulting_root_hash);
