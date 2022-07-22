@@ -121,15 +121,15 @@ mod slushie {
         ///
         /// Returns the merkle_tree root hash after insertion
         #[ink(message, payable)]
-        pub fn deposit(&mut self, hash: PoseidonHash) -> Result<PoseidonHash> {
+        pub fn deposit(&mut self, commitment: PoseidonHash) -> Result<PoseidonHash> {
             if self.env().transferred_value() != self.deposit_size {
-                return Err(Error::InvalidTransferredAmount); // FIXME: suggest a better name
+                return Err(Error::InvalidTransferredAmount);
             }
 
-            self.merkle_tree.insert(hash)?;
+            self.merkle_tree.insert(commitment)?;
 
             self.env().emit_event(Deposited {
-                hash,
+                hash: commitment,
                 timestamp: self.env().block_timestamp(),
             });
 
@@ -140,7 +140,7 @@ mod slushie {
         ///
         /// Can be withdrawn by anyone who knows the nullifier and the correct root hash
         #[ink(message)]
-        pub fn withdraw(&mut self, hash: PoseidonHash, root: PoseidonHash) -> Result<()> {
+        pub fn withdraw(&mut self, nullifier_hash: PoseidonHash, root: PoseidonHash) -> Result<()> {
             if !self.merkle_tree.is_known_root(root) {
                 return Err(Error::UnknownRoot);
             }
@@ -149,7 +149,7 @@ mod slushie {
                 return Err(Error::InsufficientFunds);
             }
 
-            if self.used_nullifiers.get(hash).is_some() {
+            if self.used_nullifiers.get(nullifier_hash).is_some() {
                 return Err(Error::NullifierAlreadyUsed);
             }
 
@@ -161,10 +161,10 @@ mod slushie {
                 return Err(Error::InvalidDepositSize);
             }
 
-            self.used_nullifiers.insert(hash, &true);
+            self.used_nullifiers.insert(nullifier_hash, &true);
 
             self.env().emit_event(Withdrawn {
-                hash,
+                hash: nullifier_hash,
                 timestamp: self.env().block_timestamp(),
             });
 
@@ -203,14 +203,14 @@ mod slushie {
         fn deposit_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let mut slushie: Slushie = Slushie::new(13);
-            let hash: PoseidonHash =
+            let commitment: PoseidonHash =
                 hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             let initial_root_hash = slushie.get_root_hash();
 
             ink_env::test::set_caller::<Environment>(accounts.bob);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(13);
-            let res = slushie.deposit(hash);
+            let res = slushie.deposit(commitment);
             assert!(res.is_ok());
 
             let resulting_root_hash = slushie.get_root_hash();
@@ -224,7 +224,7 @@ mod slushie {
             let deposit_size = 13;
             let invalid_deposit_size = 55;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash =
+            let commitment: PoseidonHash =
                 hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             let initial_root_hash = slushie.get_root_hash();
@@ -233,7 +233,7 @@ mod slushie {
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(
                 invalid_deposit_size,
             );
-            let res = slushie.deposit(hash);
+            let res = slushie.deposit(commitment);
             assert_eq!(res.unwrap_err(), Error::InvalidTransferredAmount);
 
             let resulting_root_hash = slushie.get_root_hash();
