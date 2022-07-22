@@ -121,15 +121,15 @@ mod slushie {
         ///
         /// Returns the merkle_tree root hash after insertion
         #[ink(message, payable)]
-        pub fn deposit(&mut self, hash: PoseidonHash) -> Result<PoseidonHash> {
+        pub fn deposit(&mut self, nullifier_hash: PoseidonHash) -> Result<PoseidonHash> {
             if self.env().transferred_value() != self.deposit_size {
-                return Err(Error::InvalidTransferredAmount); // FIXME: suggest a better name
+                return Err(Error::InvalidTransferredAmount);
             }
 
-            self.merkle_tree.insert(hash)?;
+            self.merkle_tree.insert(nullifier_hash)?;
 
             self.env().emit_event(Deposited {
-                hash,
+                hash: nullifier_hash,
                 timestamp: self.env().block_timestamp(),
             });
 
@@ -140,7 +140,7 @@ mod slushie {
         ///
         /// Can be withdrawn by anyone who knows the nullifier and the correct root hash
         #[ink(message)]
-        pub fn withdraw(&mut self, hash: PoseidonHash, root: PoseidonHash) -> Result<()> {
+        pub fn withdraw(&mut self, nullifier_hash: PoseidonHash, root: PoseidonHash) -> Result<()> {
             if !self.merkle_tree.is_known_root(root) {
                 return Err(Error::UnknownRoot);
             }
@@ -149,7 +149,7 @@ mod slushie {
                 return Err(Error::InsufficientFunds);
             }
 
-            if self.used_nullifiers.get(hash).is_some() {
+            if self.used_nullifiers.get(nullifier_hash).is_some() {
                 return Err(Error::NullifierAlreadyUsed);
             }
 
@@ -161,10 +161,10 @@ mod slushie {
                 return Err(Error::InvalidDepositSize);
             }
 
-            self.used_nullifiers.insert(hash, &true);
+            self.used_nullifiers.insert(nullifier_hash, &true);
 
             self.env().emit_event(Withdrawn {
-                hash,
+                hash: nullifier_hash,
                 timestamp: self.env().block_timestamp(),
             });
 
