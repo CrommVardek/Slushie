@@ -169,35 +169,36 @@ mod tests {
     use crate::tree::hasher::{Blake, Poseidon};
 
     use super::*;
+    const TEST_MAX_DEPTH: usize = 10;
 
     #[test]
     fn test_get_zero_root() {
-        let tree = MerkleTree::<7, 30, Blake>::new().unwrap();
-        assert_eq!(tree.get_last_root(), Blake::ZEROS[6]);
+        let tree = MerkleTree::<TEST_MAX_DEPTH, 30, Blake>::new().unwrap();
+        assert_eq!(tree.get_last_root(), Blake::ZEROS[TEST_MAX_DEPTH - 1]);
 
-        for i in 0..7 {
+        for i in 0..TEST_MAX_DEPTH {
             assert_eq!(tree.filled_subtrees.0[i], Blake::ZEROS[i]);
         }
     }
 
     #[test]
     fn test_insert() {
-        let mut tree = MerkleTree::<10, 30, Blake>::new().unwrap();
-        assert_eq!(tree.get_last_root(), Blake::ZEROS[9]);
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Blake>::new().unwrap();
+        assert_eq!(tree.get_last_root(), Blake::ZEROS[TEST_MAX_DEPTH - 1]);
 
         tree.insert([4; 32]).unwrap();
 
-        assert!(tree.is_known_root(Blake::ZEROS[9]));
+        assert!(tree.is_known_root(Blake::ZEROS[TEST_MAX_DEPTH - 1]));
         assert!(!tree.is_known_root(Blake::ZEROS[4]));
 
-        assert_ne!(tree.get_last_root(), Blake::ZEROS[9]);
+        assert_ne!(tree.get_last_root(), Blake::ZEROS[TEST_MAX_DEPTH - 1]);
     }
 
     #[test]
     fn test_tree_indexes() {
-        let mut tree = MerkleTree::<2, 30, Blake>::new().unwrap();
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Blake>::new().unwrap();
 
-        for i in 0..4usize {
+        for i in 0..2usize.pow(TEST_MAX_DEPTH as u32) {
             let index = tree.insert([i as u8; 32]).unwrap();
             assert_eq!(i, index);
             assert_eq!(i + 1, tree.next_index as usize);
@@ -235,9 +236,9 @@ mod tests {
 
     #[test]
     fn test_is_known_root() {
-        let mut tree = MerkleTree::<10, 30, Blake>::new().unwrap();
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Blake>::new().unwrap();
 
-        let mut known_roots = vec![Blake::ZEROS[9]];
+        let mut known_roots = vec![Blake::ZEROS[TEST_MAX_DEPTH - 1]];
 
         for i in 0..6 {
             tree.insert([i as u8 * 2; 32]).unwrap();
@@ -253,11 +254,11 @@ mod tests {
 
     #[test]
     fn test_roots_field() {
-        let mut tree = MerkleTree::<6, 30, Blake>::new().unwrap();
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Blake>::new().unwrap();
 
-        let mut roots = vec![Blake::ZEROS[5]; 30];
+        let mut roots = vec![Blake::ZEROS[TEST_MAX_DEPTH - 1]; 30];
 
-        for i in 0..10 {
+        for i in 0..TEST_MAX_DEPTH {
             tree.insert([i as u8 * 3; 32]).unwrap();
             let root = tree.get_last_root();
             let index = tree.current_root_index;
@@ -268,15 +269,14 @@ mod tests {
         assert_eq!(&tree.roots.0[..], &roots[..]);
     }
 
-    #[ignore]
     #[test]
     fn test_check_tree_zeros_correctness() {
-        let mut tree = MerkleTree::<MAX_DEPTH, 30, Blake>::new().unwrap();
-        for _i in 0..2u64.pow(MAX_DEPTH as u32) {
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 3, Blake>::new().unwrap();
+        for _i in 0..2u64.pow(TEST_MAX_DEPTH as u32) {
             tree.insert(Blake::ZEROS[0]).unwrap();
         }
 
-        for i in 0..MAX_DEPTH {
+        for i in 0..TEST_MAX_DEPTH {
             assert_eq!(tree.filled_subtrees.0[i], Blake::ZEROS[i]);
         }
     }
@@ -295,32 +295,32 @@ mod tests {
 
     #[test]
     fn test_get_zero_root_poseidon() {
-        let tree = MerkleTree::<7, 30, Poseidon>::new().unwrap();
-        assert_eq!(tree.get_last_root(), Poseidon::ZEROS[6]);
+        let tree = MerkleTree::<TEST_MAX_DEPTH, 30, Poseidon>::new().unwrap();
+        assert_eq!(tree.get_last_root(), Poseidon::ZEROS[TEST_MAX_DEPTH - 1]);
 
-        for i in 0..7 {
+        for i in 0..TEST_MAX_DEPTH {
             assert_eq!(tree.filled_subtrees.0[i], Poseidon::ZEROS[i]);
         }
     }
 
     #[test]
     fn test_insert_poseidon() {
-        let mut tree = MerkleTree::<10, 30, Poseidon>::new().unwrap();
-        assert_eq!(tree.get_last_root(), Poseidon::ZEROS[9]);
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Poseidon>::new().unwrap();
+        assert_eq!(tree.get_last_root(), Poseidon::ZEROS[TEST_MAX_DEPTH - 1]);
 
         tree.insert([4; 32]).unwrap();
 
-        assert!(tree.is_known_root(Poseidon::ZEROS[9]));
+        assert!(tree.is_known_root(Poseidon::ZEROS[TEST_MAX_DEPTH - 1]));
         assert!(!tree.is_known_root(Poseidon::ZEROS[4]));
 
-        assert_ne!(tree.get_last_root(), Poseidon::ZEROS[9]);
+        assert_ne!(tree.get_last_root(), Poseidon::ZEROS[TEST_MAX_DEPTH - 1]);
     }
 
     #[test]
     fn test_tree_indexes_poseidon() {
-        let mut tree = MerkleTree::<2, 30, Poseidon>::new().unwrap();
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Poseidon>::new().unwrap();
 
-        for i in 0..4usize {
+        for i in 0..2usize.pow(TEST_MAX_DEPTH as u32) {
             let index = tree.insert([i as u8; 32]).unwrap();
             assert_eq!(i, index);
             assert_eq!(i + 1, tree.next_index as usize);
@@ -329,9 +329,9 @@ mod tests {
 
     #[test]
     fn test_error_when_tree_is_full_poseidon() {
-        let mut tree = MerkleTree::<3, 30, Poseidon>::new().unwrap();
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Poseidon>::new().unwrap();
 
-        for i in 0..2usize.pow(3) {
+        for i in 0..2usize.pow(TEST_MAX_DEPTH as u32) {
             tree.insert([i as u8; 32]).unwrap();
         }
 
@@ -358,9 +358,9 @@ mod tests {
 
     #[test]
     fn test_is_known_root_poseidon() {
-        let mut tree = MerkleTree::<10, 30, Poseidon>::new().unwrap();
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Poseidon>::new().unwrap();
 
-        let mut known_roots = vec![Poseidon::ZEROS[9]];
+        let mut known_roots = vec![Poseidon::ZEROS[TEST_MAX_DEPTH - 1]];
 
         for i in 0..6 {
             tree.insert([i as u8 * 2; 32]).unwrap();
@@ -376,11 +376,11 @@ mod tests {
 
     #[test]
     fn test_roots_field_poseidon() {
-        let mut tree = MerkleTree::<6, 30, Poseidon>::new().unwrap();
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Poseidon>::new().unwrap();
 
-        let mut roots = vec![Poseidon::ZEROS[5]; 30];
+        let mut roots = vec![Poseidon::ZEROS[TEST_MAX_DEPTH - 1]; 30];
 
-        for i in 0..10 {
+        for i in 0..TEST_MAX_DEPTH {
             tree.insert([i as u8 * 3; 32]).unwrap();
             let root = tree.get_last_root();
             let index = tree.current_root_index;
@@ -391,15 +391,14 @@ mod tests {
         assert_eq!(&tree.roots.0[..], &roots[..]);
     }
 
-    #[ignore]
     #[test]
     fn test_check_tree_zeros_correctness_poseidon() {
-        let mut tree = MerkleTree::<MAX_DEPTH, 30, Poseidon>::new().unwrap();
-        for _i in 0..2u64.pow(MAX_DEPTH as u32) {
+        let mut tree = MerkleTree::<TEST_MAX_DEPTH, 30, Poseidon>::new().unwrap();
+        for _i in 0..2u64.pow(TEST_MAX_DEPTH as u32) {
             tree.insert(Poseidon::ZEROS[0]).unwrap();
         }
 
-        for i in 0..MAX_DEPTH {
+        for i in 0..TEST_MAX_DEPTH {
             assert_eq!(tree.filled_subtrees.0[i], Poseidon::ZEROS[i]);
         }
     }
