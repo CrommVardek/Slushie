@@ -121,15 +121,15 @@ mod slushie {
         ///
         /// Returns the merkle_tree root hash after insertion
         #[ink(message, payable)]
-        pub fn deposit(&mut self, nullifier_hash: PoseidonHash) -> Result<PoseidonHash> {
+        pub fn deposit(&mut self, commitment: PoseidonHash) -> Result<PoseidonHash> {
             if self.env().transferred_value() != self.deposit_size {
                 return Err(Error::InvalidTransferredAmount);
             }
 
-            self.merkle_tree.insert(nullifier_hash)?;
+            self.merkle_tree.insert(commitment)?;
 
             self.env().emit_event(Deposited {
-                hash: nullifier_hash,
+                hash: commitment,
                 timestamp: self.env().block_timestamp(),
             });
 
@@ -203,14 +203,14 @@ mod slushie {
         fn deposit_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let mut slushie: Slushie = Slushie::new(13);
-            let hash: PoseidonHash =
+            let commitment: PoseidonHash =
                 hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             let initial_root_hash = slushie.get_root_hash();
 
             ink_env::test::set_caller::<Environment>(accounts.bob);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(13);
-            let res = slushie.deposit(hash);
+            let res = slushie.deposit(commitment);
             assert!(res.is_ok());
 
             let resulting_root_hash = slushie.get_root_hash();
@@ -224,7 +224,7 @@ mod slushie {
             let deposit_size = 13;
             let invalid_deposit_size = 55;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash =
+            let commitment: PoseidonHash =
                 hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
 
             let initial_root_hash = slushie.get_root_hash();
@@ -233,7 +233,7 @@ mod slushie {
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(
                 invalid_deposit_size,
             );
-            let res = slushie.deposit(hash);
+            let res = slushie.deposit(commitment);
             assert_eq!(res.unwrap_err(), Error::InvalidTransferredAmount);
 
             let resulting_root_hash = slushie.get_root_hash();

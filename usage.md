@@ -15,7 +15,7 @@ Slushie is a mixer, so it means the two most important actions are:
 2) Withdraw funds from Slushie to a different account
 
 For this, we have two contract messages: `deposit` and `withdraw`.
-Right now, `deposit` only takes the `nullifier_hash` as the input,
+Right now, `deposit` only takes the `commitment` as the input,
 while also receiving some transferred value (that one will be
 able to withdraw later, knowing the randomness and the nullifier hash).
 `withdraw` takes a `nullifier_hash` and `root` (meaning

@@ -18,6 +18,7 @@ Build and deploy as a normal `ink!` contract.
 ## Testing
 
 Test normally with `cargo test`.
+Note: the tests may take up to 10 seconds to run.
 
 ## Credits
 
