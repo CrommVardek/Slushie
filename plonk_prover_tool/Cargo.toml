@@ -8,3 +8,5 @@ edition = "2021"
 
 [dependencies]
 plonk_prover = { path = "../plonk_prover" }
+clap = { version = "3.2.7", features = ["derive"] }
+sp-core = "6.0.0"
