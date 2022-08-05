@@ -1,99 +1,106 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+mod circuit;
+mod utils;
+
+use circuit::*;
+use utils::*;
+
 use dusk_bytes::Serializable;
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 use rand_core::OsRng;
 
-type PoseidonHash = [u8; 32];
-type Pubkey = [u8; 32];
-
-const CIRCUIT_SIZE: usize = 1 << 10;
 const TRANSCRIPT_INIT: &[u8; 7] = b"slushie";
 
-///Circuit that checks:
-/// 1) poseidonHash(k) = h where h is a Public Input
-#[derive(Debug, Default)]
-pub struct SlushieCircuit {
-    ///Private
-    ///Nullifier
-    k: BlsScalar,
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
 
-    ///Public
-    ///Nullifier hash
-    h: BlsScalar,
-    ///Recipient address
-    a: BlsScalar,
-    ///Relayer address
-    t: BlsScalar,
-    ///Fee
-    f: BlsScalar,
-}
+#[cfg(target_arch = "wasm32")]
+use core::array::TryFromSliceError;
 
-impl Circuit for SlushieCircuit {
-    const CIRCUIT_ID: [u8; 32] = [0xff; 32];
-    fn gadget(&mut self, composer: &mut TurboComposer) -> core::result::Result<(), Error> {
-        //Add secret elements to composer
-        let k = composer.append_witness(self.k);
+#[cfg(target_arch = "wasm32")]
+const DEFAULT_DEPTH: usize = 32;
 
-        //Add public elements to composer
-        let hash = composer.append_public_witness(self.h);
-        composer.append_public_witness(self.a);
-        composer.append_public_witness(self.t);
-        composer.append_public_witness(self.f);
+#[cfg(target_arch = "wasm32")]
+#[allow(clippy::too_many_arguments)]
+#[allow(non_snake_case)]
+#[wasm_bindgen]
+pub fn generate_proof(
+    pp: &[u8],
+    l: usize,
+    R: &[u8],
+    o: &[u8],
+    k: u32,
+    r: u32,
+    A: &[u8],
+    t: &[u8],
+    f: u64,
+) -> Result<Vec<u8>, js_sys::Error> {
+    let mut opening = [[0; 32]; DEFAULT_DEPTH];
 
-        //Compute poseidon hash of nullifier
-        let computed_hash = sponge::gadget(composer, &[k]);
-
-        //Add equal gate
-        composer.assert_equal(hash, computed_hash);
-
-        Ok(())
+    for i in 0..DEFAULT_DEPTH {
+        for j in 0..32 {
+            opening[i][j] = o[i * 32 + j];
+        }
     }
 
-    fn public_inputs(&self) -> Vec<PublicInputValue> {
-        vec![self.h.into(), self.a.into(), self.t.into(), self.f.into()]
-    }
+    let R: PoseidonHash = R
+        .try_into()
+        .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
+    let A: PoseidonHash = A
+        .try_into()
+        .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
+    let t = t
+        .try_into()
+        .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
 
-    fn padded_gates(&self) -> usize {
-        CIRCUIT_SIZE
-    }
+    prove(pp, l, R, opening, k, r, A, t, f)
+        .map_err(|err| js_sys::Error::new(&err.to_string()))
+        .map(|proof| proof.into_iter().collect())
 }
 
 ///Generation serialized proof
 #[allow(clippy::too_many_arguments)]
-pub fn prove(
+#[allow(non_snake_case)]
+pub fn prove<const DEPTH: usize>(
     //Public parameters
-    pp: Vec<u8>,
+    pp: &[u8],
     //Leaf index
-    _l: usize,
+    l: usize,
+    //Root
+    R: PoseidonHash,
     //Tree opening
-    _o: Vec<PoseidonHash>,
+    o: [PoseidonHash; DEPTH],
     //Nullifier
     k: u32,
     //Randomness
-    _r: u32,
+    r: u32,
     //Recipient address
-    a: Pubkey,
+    A: Pubkey,
     //Relayer address
     t: Pubkey,
     //Fee
     f: u64,
 ) -> Result<[u8; 1040], Error> {
     //Read public parameters
-    let pp = PublicParameters::from_slice(&pp[..])?;
+    let pp = PublicParameters::from_slice(pp)?;
 
     //Compile circuit
-    let mut circuit = SlushieCircuit::default();
+    let mut circuit = SlushieCircuit::<DEPTH>::default();
     let (pk, _vd) = circuit.compile(&pp)?;
 
     //Create circuit
-    let mut circuit = SlushieCircuit {
+    let mut circuit = SlushieCircuit::<DEPTH> {
+        R: BlsScalar(bytes_to_u64(R)),
+        r: (r as u64).into(),
         k: (k as u64).into(),
         h: sponge::hash(&[(k as u64).into()]),
-        a: BlsScalar::from_raw(bytes_to_u64(a)),
+        A: BlsScalar::from_raw(bytes_to_u64(A)),
         t: BlsScalar::from_raw(bytes_to_u64(t)),
         f: f.into(),
+        o: Array(o),
+        p: Array(index_to_path(l)),
     };
 
     //Generate proof
@@ -102,31 +109,7 @@ pub fn prove(
         .map(|proof| proof.to_bytes())
 }
 
-pub fn bytes_to_u64(bytes: [u8; 32]) -> [u64; 4] {
-    let mut result = [0; 4];
-
-    for i in 0..result.len() {
-        let bytes_8 = bytes.split_at(i * 8).1.split_at(8).0;
-        let bytes_array = <&[u8; 8]>::try_from(bytes_8).unwrap();
-        result[i] = u64::from_be_bytes(*bytes_array);
-    }
-
-    result
-}
-
-pub fn u64_to_bytes(array: [u64; 4]) -> [u8; 32] {
-    let mut result = [0; 32];
-
-    for i in 0..array.len() {
-        let bytes_array = array[i].to_be_bytes();
-        for j in 0..bytes_array.len() {
-            result[i * 8 + j] = bytes_array[j];
-        }
-    }
-
-    result
-}
-
+/// Tests take some time due to proof generating. Recommend running them in release mode
 #[cfg(test)]
 mod tests {
     use dusk_plonk::prelude::*;
@@ -135,41 +118,153 @@ mod tests {
 
     use super::*;
 
-    const MAX_DEGREE: usize = CIRCUIT_SIZE << 1;
+    const MAX_DEGREE: usize = CIRCUIT_SIZE;
 
+    /// Test for this situation:
+    ///         R
+    ///        / \
+    ///       n   o[1]
+    ///      / \
+    ///   o[0]  hash(k || r)
+    ///    0        1
     #[test]
-    fn confirm_proof() {
+    fn verification_success() {
+        //Set depth
+        const DEPTH: usize = 2;
+
+        //Set input examples
         const PAYOUT: Pubkey =
             hex!("38c4c4c0f0e9de905b304b60f3ab77b47e2f6b4a388b7859373c6e6a1581708a");
         const RELAYER: Pubkey =
             hex!("92fba99dfb7832c4268e299efb9cd3aaad7153bbee9974729340b528d276936e");
+        let k = 3141592653;
+        let r = 1;
+        let f = 0;
+        let l = 1;
 
+        //Setup public parameters
         let pp = PublicParameters::setup(MAX_DEGREE, &mut OsRng).unwrap();
 
-        let mut circuit = SlushieCircuit::default();
+        //Compile circuit
+        let mut circuit = SlushieCircuit::<DEPTH>::default();
         let (_dp, dv) = circuit.compile(&pp).unwrap();
 
+        //Calculate commitment
+        let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);
+
+        //Calculate opening
+        let mut o = [BlsScalar::zero(); DEPTH];
+        o[0] = sponge::hash(&[2.into(), 1.into()]);
+
+        o[1] = BlsScalar(bytes_to_u64(hex!(
+            "1422626DF22F8FDC85D3F1B54B05DAE703D545326D957C05089191C39D34CB74"
+        )));
+
+        //Calculate root
+        let n = sponge::hash(&[o[0], commitment]);
+        let root = sponge::hash(&[n, o[1]]);
+
+        //Generate proof
         let proof = Proof::from_bytes(
             &prove(
-                pp.to_var_bytes(),
-                0,
-                vec![],
-                3141592653,
-                0,
+                &pp.to_var_bytes(),
+                l,
+                u64_to_bytes(root.0),
+                [u64_to_bytes(o[0].0), u64_to_bytes(o[1].0)],
+                k,
+                r,
                 PAYOUT,
                 RELAYER,
-                0,
+                f,
             )
             .unwrap(),
         );
 
+        // Create public inputs
         let public_inputs: Vec<PublicInputValue> = vec![
-            sponge::hash(&[3141592653.into()]).into(),
+            root.into(),
+            sponge::hash(&[(k as u64).into()]).into(),
             BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
             BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(0).into(),
+            BlsScalar::from(f).into(),
         ];
 
-        SlushieCircuit::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT).unwrap();
+        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
+            .unwrap();
+    }
+
+    /// Test for this situation but with wrong index:
+    ///         R
+    ///        / \
+    ///       n   o[1]
+    ///      / \
+    ///   o[0]  hash(k || r)
+    ///    0        1
+    #[test]
+    #[should_panic]
+    fn verification_error() {
+        //Set depth
+        const DEPTH: usize = 2;
+
+        //Set input examples
+        const PAYOUT: Pubkey =
+            hex!("38c4c4c0f0e9de905b304b60f3ab77b47e2f6b4a388b7859373c6e6a1581708a");
+        const RELAYER: Pubkey =
+            hex!("92fba99dfb7832c4268e299efb9cd3aaad7153bbee9974729340b528d276936e");
+        let k = 3141592653;
+        let r = 1;
+        let f = 0;
+        // Wrong index
+        let l = 0;
+
+        //Setup public parameters
+        let pp = PublicParameters::setup(MAX_DEGREE, &mut OsRng).unwrap();
+
+        //Compile circuit
+        let mut circuit = SlushieCircuit::<DEPTH>::default();
+        let (_dp, dv) = circuit.compile(&pp).unwrap();
+
+        //Calculate commitment
+        let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);
+
+        //Calculate opening
+        let mut o = [BlsScalar::zero(); DEPTH];
+        o[0] = sponge::hash(&[2.into(), 1.into()]);
+
+        o[1] = BlsScalar(bytes_to_u64(hex!(
+            "1422626DF22F8FDC85D3F1B54B05DAE703D545326D957C05089191C39D34CB74"
+        )));
+
+        //Calculate root
+        let n = sponge::hash(&[o[0], commitment]);
+        let root = sponge::hash(&[n, o[1]]);
+
+        //Generate proof
+        let proof = Proof::from_bytes(
+            &prove(
+                &pp.to_var_bytes(),
+                l,
+                u64_to_bytes(root.0),
+                [u64_to_bytes(o[0].0), u64_to_bytes(o[1].0)],
+                k,
+                r,
+                PAYOUT,
+                RELAYER,
+                f,
+            )
+            .unwrap(),
+        );
+
+        // Create public inputs
+        let public_inputs: Vec<PublicInputValue> = vec![
+            root.into(),
+            sponge::hash(&[(k as u64).into()]).into(),
+            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
+            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
+            BlsScalar::from(f).into(),
+        ];
+
+        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
+            .unwrap();
     }
 }
