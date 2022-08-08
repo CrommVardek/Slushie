@@ -28,3 +28,8 @@ pub fn write_in_file(res: &[u8; 1040], path: &str) {
     let mut f = File::create(path).expect("Unable to create file");
     f.write_all(res).expect("Unable to write data");
 }
+
+pub fn json_parce(o: &str) -> Vec<[u8; 32]> {
+    let json: serde_json::Value = serde_json::from_str(o).expect("JSON was not well-formatted");
+    let arr: [u8; 32] = json.try_into().unwrap();
+}
