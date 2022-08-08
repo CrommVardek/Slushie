@@ -10,10 +10,13 @@ pub struct Args {
     pub l: usize,
 
     #[clap(short, long, value_parser)]
-    R: String,
+    pub rr: String,
 
     #[clap(short, long, value_parser)]
-    o: String,
+    pub o: String,
+
+    #[clap(short, long, value_parser)]
+    pub switch_to_file: String,
 
     #[clap(short, long, value_parser, default_value_t = 1)]
     pub k: u32,

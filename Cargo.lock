@@ -1981,6 +1981,7 @@ name = "plonk_prover_tool"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "hex",
  "plonk_prover",
  "serde",
  "serde_json",

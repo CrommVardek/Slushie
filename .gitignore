@@ -5,3 +5,4 @@
 **/*.rs.bk
 
 plonk_prover_tool/test-proof
+plonk_prover_tool/test-json.json
