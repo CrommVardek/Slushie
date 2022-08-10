@@ -1,67 +1,40 @@
 use hex;
-use sp_core::crypto::*;
+use serde_json::Value;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::Path;
-
 use crate::DEFDIP;
 
-pub fn include_bytes(path: &str) -> Vec<u8> {
-    let path = Path::new(path);
-    let display = path.display();
-    let mut file = match File::open(&path) {
-        Err(why) => panic!("Couldn't open {}: {}", display, why),
-        Ok(file) => file,
-    };
-    let mut bytes = Vec::new();
-    if let Err(why) = file.read_to_end(&mut bytes) {
-        panic!("Couldn't read {}: {}", display, why)
-    };
-    bytes
-}
-
-pub fn account_id_to_bites(par: &str) -> [u8; 32] {
-    AccountId32::from_ss58check(par).expect("Could not convert input to AccountId32").into()
-}
-
-pub fn write_in_file(res: &[u8; 1040], path: &str) {
+pub fn write_to_file(res: &[u8; 1040], path: &str) {
     let mut f = File::create(path).expect("Unable to create file");
     f.write_all(res).expect("Unable to write data");
 }
 
-pub fn json_parce(o: &str, switch_to_file: &str) -> [[u8; 32]; DEFDIP] {
-    if switch_to_file != "file" {
-        let json: serde_json::Value = serde_json::from_str(o).expect("JSON was not well-formatted");
-
-        let mut res = [[0; 32]; DEFDIP];
+pub fn input_json_in_array (json: Value) -> [[u8; 32]; DEFDIP] {
+    let mut key_input = [[0; 32]; DEFDIP];
         if let serde_json::Value::Array(arr) = &json {
             for i in 0..DEFDIP {
-                if let serde_json::Value::String(type_one) = &arr[i] {
-                    res[i] = hex::decode(type_one)
+                if let serde_json::Value::String(json_data) = &arr[i] {
+                    key_input[i] = hex::decode(json_data)
                         .unwrap()
                         .try_into()
                         .expect("Unable to write JSON");
                 }
             }
         }
-        res
+        key_input
+}
+
+pub fn json_parse(o: &str, file_path: &str) -> [[u8; 32]; DEFDIP] {
+    if file_path != "test-json.json" {
+        let json: serde_json::Value = serde_json::from_str(o).expect("JSON was not well-formatted");
+
+        input_json_in_array (json)
     } else {
-        let file = fs::File::open("test-json.json").expect("File should open read only");
+        let file = fs::File::open(file_path).expect("File should open read only");
         let json: serde_json::Value =
             serde_json::from_reader(file).expect("File should be proper JSON");
 
-        let mut res = [[0; 32]; DEFDIP];
-        if let serde_json::Value::Array(arr) = &json {
-            for i in 0..DEFDIP {
-                if let serde_json::Value::String(type_one) = &arr[i] {
-                    res[i] = hex::decode(type_one)
-                        .unwrap()
-                        .try_into()
-                        .expect("Unable to write JSON");
-                }
-            }
-        }
-        res
+            input_json_in_array (json)
     }
 } 
