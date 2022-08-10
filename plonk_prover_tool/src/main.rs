@@ -9,7 +9,7 @@ use plonk_prover::prove;
 pub const DEFDIP: usize = 2;
 
 fn generate_proof(args: Args) {
-    let pp = get_bytes_from_file(&args.pp);
+    let pp = include_bytes(&args.pp);
     let a = account_id_to_bites(&args.a);
     let t = account_id_to_bites(&args.t);
     let o = json_parce(&args.o, &args.switch_to_file);

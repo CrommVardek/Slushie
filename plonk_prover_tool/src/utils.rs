@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::DEFDIP;
 
-pub fn get_bytes_from_file(path: &str) -> Vec<u8> {
+pub fn include_bytes(path: &str) -> Vec<u8> {
     let path = Path::new(path);
     let display = path.display();
     let mut file = match File::open(&path) {
@@ -22,10 +22,7 @@ pub fn get_bytes_from_file(path: &str) -> Vec<u8> {
 }
 
 pub fn account_id_to_bites(par: &str) -> [u8; 32] {
-    match AccountId32::from_ss58check(par) {
-        Ok(account_id) => account_id.into(),
-        Err(_) => panic!("Not valid account id"),
-    }
+    AccountId32::from_ss58check(par).expect("Could not convert input to AccountId32").into()
 }
 
 pub fn write_in_file(res: &[u8; 1040], path: &str) {
@@ -67,4 +64,4 @@ pub fn json_parce(o: &str, switch_to_file: &str) -> [[u8; 32]; DEFDIP] {
         }
         res
     }
-}
+} 
