@@ -26,7 +26,7 @@ pub fn input_json_in_array(json: Value) -> [[u8; 32]; DEPTH] {
 }
 
 pub fn json_parse(o: &str) -> [[u8; 32]; DEPTH] {
-    if o != "test-json.json" {
+    if !o.ends_with("json") {
         let json: serde_json::Value = serde_json::from_str(o).expect("JSON was not well-formatted");
         input_json_in_array(json)
     } else {
