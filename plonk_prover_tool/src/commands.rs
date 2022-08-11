@@ -15,9 +15,6 @@ pub struct Args {
     #[clap(short, long, value_parser)]
     pub o: String,
 
-    #[clap(short, long, value_parser)]
-    pub switch_to_file: String,
-
     #[clap(short, long, value_parser, default_value_t = 1)]
     pub k: u32,
 

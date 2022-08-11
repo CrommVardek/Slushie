@@ -1,5 +1,5 @@
 mod utils;
-use std::{path::Path, fs::File, io::Read};
+use std::{fs::File, io::Read, path::Path};
 
 use clap::Parser;
 use sp_core::crypto::{AccountId32, Ss58Codec};
@@ -9,15 +9,20 @@ use commands::*;
 use hex;
 use plonk_prover::prove;
 
-pub const DEFDIP: usize = 2;
+//size of array that contains keys
+pub const DEPTH: usize = 2;
 
 fn generate_proof(args: Args) {
     let path = Path::new(&args.pp);
     let mut bytes = Vec::new();
     let _ = File::open(&path).unwrap().read_to_end(&mut bytes);
-    let a = AccountId32::from_ss58check(&args.a).expect("Could not convert input to AccountId32").into();
-    let t = AccountId32::from_ss58check(&args.t).expect("Could not convert input to AccountId32").into();
-    let o = json_parse(&args.o, &args.switch_to_file);
+    let a = AccountId32::from_ss58check(&args.a)
+        .expect("Could not convert input to AccountId32")
+        .into();
+    let t = AccountId32::from_ss58check(&args.t)
+        .expect("Could not convert input to AccountId32")
+        .into();
+    let o = json_parse(&args.o);
     let rr: [u8; 32] = hex::decode(args.rr).unwrap().try_into().unwrap();
     let proof = prove(&bytes, args.l, rr, o, args.k, args.r, a, t, args.f);
     write_to_file(&proof.expect("Could not generate proof"), &args.input);
@@ -35,7 +40,6 @@ mod tests {
             pp: "test-correct-pp".to_string(),
             rr: "28f396386a802cf7ffdc2288c0a95c5807730c504bb8ba8b6c1033c598ddf4dd".to_string(),
             o: r#"["1422626DF22F8FDC85D3F1B54B05DAE703D545326D957C05089191C39D34CB74","1422626DF22F8FDC85D3F1B54B05DAE703D545326D957C05089191C39D34CB74"]"#.to_string(),
-            switch_to_file: "don't call json file".to_string(),
             l: 1,
             k: 3141592653,
             r: 1,
@@ -51,8 +55,7 @@ mod tests {
         generate_proof(Args {
             pp: "test-correct-pp".to_string(),
             rr: "28f396386a802cf7ffdc2288c0a95c5807730c504bb8ba8b6c1033c598ddf4dd".to_string(),
-            o: "11".to_string(),
-            switch_to_file: "test-json.json".to_string(),
+            o: "test-json.json".to_string(),
             l: 1,
             k: 3141592653,
             r: 1,
@@ -70,7 +73,6 @@ mod tests {
             pp: "test-wrong-pp".to_string(),
             rr: "28f396386a802cf7ffdc2288c0a95c5807730c504bb8ba8b6c1033c598ddf4dd".to_string(),
             o: r#"["1422626DF22F8FDC85D3F1B54B05DAE703D545326D957C05089191C39D34CB74","1422626DF22F8FDC85D3F1B54B05DAE703D545326D957C05089191C39D34CB74"]"#.to_string(),
-            switch_to_file: "don't call json file".to_string(),
             l: 1,
             k: 3141592653,
             r: 1,
