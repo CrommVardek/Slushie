@@ -5,7 +5,8 @@ use ink_storage::traits::{ExtKeyPtr, StorageLayout};
 use ink_storage::traits::{PackedLayout, SpreadAllocate, SpreadLayout};
 
 /// Merkle tree maximum depth
-pub const MAX_DEPTH: usize = 32;
+use shared::constants::MAX_DEPTH;
+
 /// Merkle tree history size
 pub const DEFAULT_ROOT_HISTORY_SIZE: usize = 100;
 
@@ -129,7 +130,9 @@ pub(crate) enum MerkleTreeError {
     DepthIsZero,
 }
 
-#[derive(scale::Encode, scale::Decode, PackedLayout, SpreadLayout, SpreadAllocate, PartialEq)]
+#[derive(
+    scale::Encode, scale::Decode, PackedLayout, SpreadLayout, SpreadAllocate, PartialEq, Eq,
+)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Array<T: Default + Clone + Copy, const N: usize>([T; N]);
 
@@ -165,6 +168,7 @@ impl<T: Default + Clone + Copy, const N: usize> Default for Array<T, N> {
 mod tests {
     use dusk_bls12_381::BlsScalar;
     use ink_env::hash::{Blake2x256, CryptoHash};
+    use shared::functions::bytes_to_u64;
 
     use crate::tree::hasher::{Blake, Poseidon};
 
@@ -407,7 +411,7 @@ mod tests {
     fn test_check_zeros_correctness_poseidon() {
         let mut result: [u8; 32] = Default::default();
         Blake2x256::hash(b"slushie", &mut result);
-        let result = Poseidon::bytes_to_u64(result);
+        let result = bytes_to_u64(result);
 
         let mut result = BlsScalar::from_raw(result);
 

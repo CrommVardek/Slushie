@@ -60,3 +60,10 @@ For build to wasm:
 `cargo install wasm-pack`
 - run this command:
 `wasm-pack build`
+
+## Test:
+
+Tests take some time due to proof generating. Recommend running them in release mode with parallel feature:
+`cargo test -r --features parallel`  
+To run wasm tests:
+`wasm-pack test --node -r`

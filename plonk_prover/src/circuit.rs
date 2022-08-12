@@ -1,12 +1,13 @@
 use crate::*;
 
+use alloc::vec::Vec;
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 
 pub(crate) type PoseidonHash = [u8; 32];
 pub(crate) type Pubkey = [u8; 32];
 
-pub(crate) const CIRCUIT_SIZE: usize = 1 << 12;
+pub(crate) const CIRCUIT_SIZE: usize = 1 << 16;
 
 /// Circuit that checks:
 /// 1) poseidonHash(k) = h where h is a Public Input

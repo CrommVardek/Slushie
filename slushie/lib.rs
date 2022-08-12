@@ -38,9 +38,8 @@ mod tree;
 mod slushie {
     use super::*;
     use crate::tree::hasher::Poseidon;
-    use crate::tree::merkle_tree::{
-        MerkleTree, MerkleTreeError, DEFAULT_ROOT_HISTORY_SIZE, MAX_DEPTH,
-    };
+    use crate::tree::merkle_tree::{MerkleTree, MerkleTreeError, DEFAULT_ROOT_HISTORY_SIZE};
+    use shared::constants::MAX_DEPTH;
 
     type PoseidonHash = [u8; 32];
 

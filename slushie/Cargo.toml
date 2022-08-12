@@ -17,8 +17,12 @@ scale-info = { version = "2", default-features = false, features = ["derive"], o
 
 hex-literal = "0.3.4"
 
-dusk-poseidon = { version = "0.22.0", default-features = false }
-dusk-bls12_381 = {version = "0.8.0", default-features = false}
+dusk-poseidon = { version = "0.26.0-rc.0", default-features = false, features = [
+    "alloc",
+] }
+dusk-bls12_381 = { version = "0.10", default-features = false }
+
+shared = { path = "../shared", default-features = false }
 
 [lib]
 name = "slushie"
@@ -39,5 +43,6 @@ std = [
     "scale-info/std",
     "dusk-poseidon/std",
     "dusk-bls12_381/std",
+    "shared/default",
 ]
 ink-as-dependency = []
