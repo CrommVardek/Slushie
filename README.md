@@ -1,5 +1,7 @@
 # Slushie
 
+![w3f grants program badge](https://github.com/w3f/Grants-Program/blob/master/src/badge_black.svg)
+
 Slushie is a protocol for private transactions within `pallet-contracts`-compliant networks. It allows users to carry out private balance transfers,
 thanks to advanced cryptography.
 
