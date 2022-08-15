@@ -1,5 +1,7 @@
 use clap::Parser;
 
+/// The CLI Args struct.
+/// For the description of the params, please refer to the README.
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 pub struct Args {
