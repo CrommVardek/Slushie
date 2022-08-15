@@ -1,4 +1,5 @@
 mod utils;
+use std::io::Write;
 use std::{fs::File, io::Read, path::Path};
 
 use clap::Parser;
@@ -21,10 +22,14 @@ fn generate_proof(args: Args) {
     let t = AccountId32::from_ss58check(&args.t)
         .expect("Could not convert input to AccountId32")
         .into();
-    let o = json_parse(&args.o);
+    let o = parse_tree_openings(&args.o);
     let rr: [u8; 32] = hex::decode(args.rr).unwrap().try_into().unwrap();
-    let proof = prove(&bytes, args.l, rr, o, args.k, args.r, a, t, args.f);
-    write_to_file(&proof.expect("Could not generate proof"), &args.input);
+    let proof =
+        prove(&bytes, args.l, rr, o, args.k, args.r, a, t, args.f).expect("Error generating proof");
+    let mut output_file = File::create(&args.output_file).expect("Unable to create file");
+    output_file
+        .write_all(&proof)
+        .expect("Unable to write proof to file");
 }
 fn main() {
     generate_proof(Args::parse());
@@ -67,7 +72,7 @@ mod tests {
             a: "5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK".to_string(),
             t: "5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK".to_string(),
             f: 1,
-            input: "test-proof".to_string(),
+            output_file: "test-proof".to_string(),
         });
     }
 
@@ -83,7 +88,7 @@ mod tests {
             a: "5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK".to_string(),
             t: "5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK".to_string(),
             f: 1,
-            input: "test-proof".to_string(),
+            output_file: "test-proof".to_string(),
         });
     }
 
@@ -122,7 +127,7 @@ mod tests {
             a: "5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK".to_string(),
             t: "5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK".to_string(),
             f: 1,
-            input: "test-proof".to_string(),
+            output_file: "test-proof".to_string(),
         });
     }
 }
