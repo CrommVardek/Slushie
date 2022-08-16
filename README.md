@@ -12,10 +12,6 @@ Slushie is currently implemented as an [ink!-based smart-contract](./slushie/usa
 Slushie uses [`plonk`](https://github.com/dusk-network/plonk) as the ZKP system and [`poseidon252`](https://github.com/dusk-network/Poseidon252) as the
 Pedersen hash.
 
-### Building blocks
-
-The project consists of several parts. This 
-
 ## Running
 
 Build and deploy as a normal `ink!` contract.
