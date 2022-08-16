@@ -7,8 +7,7 @@ thanks to advanced cryptography.
 
 ## Implementation
 
-Slushie is currently implemented as an ink!-based smart-contract, but in the later phases of development, Slushie will also use an off-chain relayer tool
-and some more good stuff responsible for generating zero-knowledge proofs.
+Slushie is currently implemented as an [ink!-based smart-contract](./slushie/usage.md), [prover library](./plonk_prover/README.md), and the [CLI tool](./plonk_prover_tool/README.md) to generate proofs in the off-chain context.
 
 Slushie uses [`plonk`](https://github.com/dusk-network/plonk) as the ZKP system and [`poseidon252`](https://github.com/dusk-network/Poseidon252) as the
 Pedersen hash.
