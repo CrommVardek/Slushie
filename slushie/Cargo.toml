@@ -20,7 +20,7 @@ hex-literal = "0.3.4"
 dusk-poseidon = { version = "0.26.0-rc.0", default-features = false, features = [
     "alloc",
 ] }
-dusk-bls12_381 = { version = "0.10", default-features = false }
+dusk-bls12_381 = { version = "0.11.0-rc", default-features = false }
 
 shared = { path = "../shared", default-features = false }
 
