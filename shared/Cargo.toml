@@ -12,6 +12,9 @@ path = "src/lib.rs"
 [dependencies]
 dusk-bls12_381 = { version = "0.11.0-rc", default-features = false }
 
+[dev-dependencies]
+hex-literal = "0.3.4"
+
 [features]
 default = ["std"]
 std = ["dusk-bls12_381/default"]

@@ -83,7 +83,7 @@ impl<const DEPTH: usize, const ROOT_HISTORY_SIZE: usize, Hash: MerkleTreeHasher>
     pub fn insert(&mut self, leaf: Hash::Output) -> Result<usize, MerkleTreeError> {
         let next_index = self.next_index as usize;
 
-        if self.next_index == 2u64.pow(DEPTH as u32) {
+        if self.next_index == 1 << DEPTH {
             return Err(MerkleTreeError::MerkleTreeIsFull);
         }
 

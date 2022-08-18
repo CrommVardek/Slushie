@@ -34,19 +34,23 @@ use ink_lang as ink;
 
 mod tree;
 
+#[allow(clippy::let_unit_value)]
+#[allow(clippy::large_enum_variant)]
 #[ink::contract]
 mod slushie {
     use super::*;
     use crate::tree::hasher::Poseidon;
     use crate::tree::merkle_tree::{MerkleTree, MerkleTreeError, DEFAULT_ROOT_HISTORY_SIZE};
-    use shared::constants::MAX_DEPTH;
+    use shared::constants::DEFAULT_DEPTH;
 
     type PoseidonHash = [u8; 32];
+
+    const SERIALIZED_PP: &[u8] = include_bytes!("./pp-test");
 
     #[ink(storage)]
     #[derive(ink_storage::traits::SpreadAllocate)]
     pub struct Slushie {
-        merkle_tree: MerkleTree<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>,
+        merkle_tree: MerkleTree<DEFAULT_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>,
         deposit_size: Balance,
         used_nullifiers: ink_storage::Mapping<PoseidonHash, bool>,
     }
@@ -81,6 +85,8 @@ mod slushie {
         InsufficientFunds,
         NullifierAlreadyUsed,
         UnknownRoot,
+        VerificationProofFailed,
+        TransferFailed,
     }
 
     impl From<MerkleTreeError> for Error {
@@ -91,6 +97,17 @@ mod slushie {
                 MerkleTreeError::DepthIsZero => Error::MerkleTreeInvalidDepth,
             }
         }
+    }
+
+    /// Struct for public inputs for withdraw method
+    #[derive(scale::Encode, scale::Decode)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct PublicInputs {
+        nullifier_hash: PoseidonHash,
+        root: PoseidonHash,
+        proof: [u8; 1040],
+        fee: u64,
+        recipient: AccountId,
     }
 
     pub type Result<T> = core::result::Result<T, Error>;
@@ -107,9 +124,9 @@ mod slushie {
         pub fn new(deposit_size: Balance) -> Self {
             ink::utils::initialize_contract(|me: &mut Self| {
                 *me = Self {
-                    merkle_tree: MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new(
-                    )
-                    .unwrap(),
+                    merkle_tree:
+                        MerkleTree::<DEFAULT_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new()
+                            .unwrap(),
                     deposit_size,
                     used_nullifiers: Default::default(),
                 };
@@ -121,12 +138,15 @@ mod slushie {
         /// Returns the merkle_tree root hash after insertion
         #[ink(message, payable)]
         pub fn deposit(&mut self, commitment: PoseidonHash) -> Result<PoseidonHash> {
+            // Check that transferred value equal to deposit size
             if self.env().transferred_value() != self.deposit_size {
                 return Err(Error::InvalidTransferredAmount);
             }
 
+            // Save commitment to the merkle tree
             self.merkle_tree.insert(commitment)?;
 
+            // Emit Deposited Event
             self.env().emit_event(Deposited {
                 hash: commitment,
                 timestamp: self.env().block_timestamp(),
@@ -139,31 +159,43 @@ mod slushie {
         ///
         /// Can be withdrawn by anyone who knows the nullifier and the correct root hash
         #[ink(message)]
-        pub fn withdraw(&mut self, nullifier_hash: PoseidonHash, root: PoseidonHash) -> Result<()> {
-            if !self.merkle_tree.is_known_root(root) {
+        pub fn withdraw(&mut self, public_inputs: PublicInputs) -> Result<()> {
+            // Check that provided root is known
+            if !self.merkle_tree.is_known_root(public_inputs.root) {
                 return Err(Error::UnknownRoot);
             }
 
+            // Check that contract has enough balance
             if self.env().balance() < self.deposit_size {
                 return Err(Error::InsufficientFunds);
             }
 
-            if self.used_nullifiers.get(nullifier_hash).is_some() {
+            // Check that provided nullifier hash is not used
+            if self
+                .used_nullifiers
+                .get(public_inputs.nullifier_hash)
+                .is_some()
+            {
                 return Err(Error::NullifierAlreadyUsed);
             }
 
-            if self
-                .env()
-                .transfer(self.env().caller(), self.deposit_size)
-                .is_err()
-            {
-                return Err(Error::InvalidDepositSize);
+            // Check provided proof
+            if !Self::check_proof(SERIALIZED_PP, &public_inputs, self.env().caller()) {
+                return Err(Error::VerificationProofFailed);
             }
 
-            self.used_nullifiers.insert(nullifier_hash, &true);
+            // Transfer to recipient
+            self.env()
+                .transfer(public_inputs.recipient, self.deposit_size)
+                .map_err(|_| Error::TransferFailed)?;
 
+            // Save used nullifier hash
+            self.used_nullifiers
+                .insert(public_inputs.nullifier_hash, &true);
+
+            // Emit Withdrawn Event
             self.env().emit_event(Withdrawn {
-                hash: nullifier_hash,
+                hash: public_inputs.nullifier_hash,
                 timestamp: self.env().block_timestamp(),
             });
 
@@ -174,6 +206,11 @@ mod slushie {
         #[ink(message)]
         pub fn get_root_hash(&self) -> PoseidonHash {
             self.merkle_tree.get_last_root() as PoseidonHash
+        }
+
+        //TODO MP-34
+        fn check_proof(_pp: &[u8], _public_inputs: &PublicInputs, _relayer: AccountId) -> bool {
+            true
         }
     }
 
@@ -193,7 +230,7 @@ mod slushie {
             assert_eq!(slushie.deposit_size, 13 as Balance);
             assert_eq!(
                 slushie.merkle_tree,
-                MerkleTree::<MAX_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new().unwrap()
+                MerkleTree::<DEFAULT_DEPTH, DEFAULT_ROOT_HISTORY_SIZE, Poseidon>::new().unwrap()
             );
         }
 
@@ -261,7 +298,13 @@ mod slushie {
             let resulting_root_hash = slushie.get_root_hash();
 
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
-            let res = slushie.withdraw(hash, resulting_root_hash);
+            let res = slushie.withdraw(PublicInputs {
+                nullifier_hash: hash,
+                root: resulting_root_hash,
+                proof: [0; 1040],
+                fee: 0,
+                recipient: accounts.bob,
+            });
             assert!(res.is_ok());
         }
 
@@ -282,7 +325,13 @@ mod slushie {
             let resulting_root_hash = slushie.get_root_hash();
 
             ink_env::test::set_caller::<Environment>(accounts.eve);
-            let res = slushie.withdraw(hash, resulting_root_hash);
+            let res = slushie.withdraw(PublicInputs {
+                nullifier_hash: hash,
+                root: resulting_root_hash,
+                proof: [0; 1040],
+                fee: 0,
+                recipient: accounts.bob,
+            });
             assert!(res.is_ok());
         }
 
@@ -303,7 +352,13 @@ mod slushie {
             let invalid_root_hash: PoseidonHash =
                 hex!("0000000000000000 0000000000000000 0001020304050607 08090a0b0c0d0e0f");
 
-            let res = slushie.withdraw(hash, invalid_root_hash);
+            let res = slushie.withdraw(PublicInputs {
+                nullifier_hash: hash,
+                root: invalid_root_hash,
+                proof: [0; 1040],
+                fee: 0,
+                recipient: accounts.bob,
+            });
             assert_eq!(res.unwrap_err(), Error::UnknownRoot);
         }
 
@@ -322,10 +377,22 @@ mod slushie {
             assert!(res.is_ok());
             let resulting_root_hash = slushie.get_root_hash();
 
-            let res = slushie.withdraw(hash, resulting_root_hash);
+            let res = slushie.withdraw(PublicInputs {
+                nullifier_hash: hash,
+                root: resulting_root_hash,
+                proof: [0; 1040],
+                fee: 0,
+                recipient: accounts.bob,
+            });
             assert!(res.is_ok());
 
-            let res = slushie.withdraw(hash, resulting_root_hash);
+            let res = slushie.withdraw(PublicInputs {
+                nullifier_hash: hash,
+                root: resulting_root_hash,
+                proof: [0; 1040],
+                fee: 0,
+                recipient: accounts.bob,
+            });
             assert_eq!(res.unwrap_err(), Error::NullifierAlreadyUsed);
         }
     }
