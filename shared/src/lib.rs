@@ -2,3 +2,4 @@
 
 pub mod constants;
 pub mod functions;
+pub mod public_inputs;
