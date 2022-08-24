@@ -1,13 +1,19 @@
 use std::net::SocketAddr;
+use std::ops::Deref;
 
+use async_once::AsyncOnce;
 use jsonrpsee::{
     core::server::access_control::AccessControlBuilder,
     http_server::{HttpServerBuilder, HttpServerHandle, RpcModule},
 };
+use lazy_static::lazy_static;
+use random_string::generate;
+use sp_keyring::AccountKeyring;
 use subxt::ext::sp_core::bytes::from_hex;
-use subxt::Error;
+use subxt::tx::PairSigner;
+use subxt::{Error, OnlineClient, PolkadotConfig};
 
-use jsonrpsee_server::tr::withdraw;
+use jsonrpsee_server::withdraw;
 use shared::public_inputs::*;
 
 #[tokio::main]
@@ -16,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .try_init()
         .expect("setting default subscriber failed");
-
+    let charset = "abcdefghjklmnpoqrstuvyz";
     let (server_addr, _handle) = run_server().await?;
     println!("Run the following snippet in the developer console in any Website.");
     println!(
@@ -28,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
             body: JSON.stringify({{
                 jsonrpc: '2.0',
                 method: 'method_name',
-                params: [nullifierHash, root, proof, fee, recipient],
+                params: [{}, root, fee, recipient],
                 id: 1
             }})
         }}).then(res => {{
@@ -38,18 +44,24 @@ async fn main() -> anyhow::Result<()> {
             console.log("Response Body:", body)
         }});
     "#,
-        server_addr
+        server_addr,
+        generate(32, charset)
     );
     futures::future::pending().await
 }
 
-async fn handle_methods() -> Result<RpcModule<()>, Error> {
+lazy_static! {
+    static ref API: AsyncOnce<OnlineClient<PolkadotConfig>> =
+        AsyncOnce::new(async { OnlineClient::<PolkadotConfig>::new().await.unwrap() });
+}
+
+///Create RPC module with registered methods.
+async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
     let mut module = RpcModule::new(());
 
     module.register_async_method("withdraw", |params, _| async move {
         let params_vec: Vec<String> = params.parse()?;
         let inputs = WithdrawInputs {
-
             nullifier_hash: params_vec[0]
                 .as_bytes()
                 .try_into()
@@ -64,13 +76,20 @@ async fn handle_methods() -> Result<RpcModule<()>, Error> {
             fee: params_vec[2].parse::<u64>().expect("Invalid fee"),
             recipient: params_vec[3].as_bytes().try_into().unwrap(),
         };
-        withdraw(inputs).await.unwrap();
-        Ok(())
+
+        let signer: PairSigner<PolkadotConfig, sp_keyring::sr25519::sr25519::Pair> =
+            PairSigner::new(AccountKeyring::Alice.pair());
+        withdraw(API.get().await.deref(), signer, inputs)
+            .await
+            .unwrap();
+
+        Ok("good".to_string())
     })?;
 
     Ok(module)
 }
 
+///Run server.
 async fn run_server() -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     let acl = AccessControlBuilder::new()
         .allow_all_headers()
@@ -84,7 +103,7 @@ async fn run_server() -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
         .await?;
 
     let addr = server.local_addr()?;
-    let module = handle_methods().await?;
+    let module = setup_rpc_module().await?;
     let server_handle = server.start(module)?;
 
     Ok((addr, server_handle))
