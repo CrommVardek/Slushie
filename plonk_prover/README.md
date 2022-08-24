@@ -1,6 +1,6 @@
 # Generating proof logic
 
-Library which generate proof for withdraw method.
+The library generates proof for the withdrawal method.
 
 Arguments:
 - `pp` - serialized public parameters
@@ -23,11 +23,10 @@ Arguments:
 
 #### Nullifier Hash
 
-Circuit checks that nullifier hash from public inputs equal to the computed nullifier hash from secrets inputs
+Circuit checks that the nullifier hash from public inputs equal to the computed nullifier hash from secrets inputs
 
 #### Merkle Tree
-
-Using leaf index program generate path from root to this leaf. For example, for this tree:
+Using the leaf index program generates the path from the root to this leaf. For example, for this tree:
 
 ```
     R
@@ -36,26 +35,24 @@ Using leaf index program generate path from root to this leaf. For example, for 
  / \
 o0  hash(k || r)
 ```
-path from root to leaf would be [1, 0], 
+the path from the root to leaf would be [1, 0], 
 where 0 - left, 1 - right,
 reverse order due to lifting from leaf to root
 
-After that, using generated path and tree opening, circuit computes all hashes on the path. 
-
-In example above: 
+After that, using the generated path and tree opening, the circuit computes all hashes on the path. 
+In the example above: 
 - n hash will be computed using hash(k || r) and o0
 - R hash will be computed using n and o1
 
-In the end, circuit checks that root hash from public inputs equal to the computed root hash
+In the end, the circuit checks that the root hash from public inputs equals the computed root hash
 
 #### Public inputs
 
-Circuit checks that Public inputs provided for proof generating equals Public inputs provided for proof verification
+Circuit checks that Public inputs, provided for proof generating, are equal to Public inputs provided for proof verification
 
 
 ## WASM:
-
-For build to wasm:
+For a build to wasm:
 - install [wasm-pack](https://rustwasm.github.io/wasm-pack/):
 `cargo install wasm-pack`
 - run this command:

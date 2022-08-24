@@ -1,16 +1,16 @@
 # The Plonk Prover CLI tool
-Arguments:
 
-- `pp` - serialized public parameters
-- `l` - Leaf index
-- `rr` - root hash
-- `o` - Tree opening (value of sister nodes on the way from leaf l to the root R)
-- `k` - Nullifier
-- `r` - Randomness
-- `a` - Recipient address
-- `t` - Relayer address
-- `f` - Fee
-- `output-file` - where to output the proof
+CLI tool which produced serialized plonk proof which will be used in withdraw contract method to verify knowledge of the randomness & nullifier. For generating proof this tool uses these arguments:
+
+- `pp` - Serialized public parameters, which are hardcoded for now in the `test-correct-pp` file and later will be generated from a trusted setup ceremony
+- `l` - Leaf index of commitment `C` 
+- `rr` - Root `R`
+- `o` - Tree opening `O(l)` (value of sister nodes on the way from leaf l to the root R)
+- `k` - Nullifier `k` - random 32-bit unsigned integer
+- `r` - Randomness `r` - random 32-bit unsigned integer
+- `a` - Recipient address `A` on which contract will send `N - fee` Tokens, where N is deposit size and has been set up during contract initialization and fee - Relayer fee
+- `t` - Relayer address `t` on which contract will send the `fee``
+- `f` - Relayer fee `f`
 
 ## Main used libraries:
 - [**clap**](https://docs.rs/clap/latest/clap/) for the core CLI logic
@@ -20,12 +20,24 @@ Arguments:
 ### Note
 Please note that the tests are *very* long-running. Take your time when running them :)
 ## Run CLI:
-for running CLI you need to use command:
+for running CLI you need to use the command:
 ```bash
 cargo run -r -- --name value 
 ```
-- name - name of arguments
+- name - the name of the argument
 - value - value that you want to input for CLI
+
+## Description of input values:
+- `pp` - Path to file with serialized Public Parameters `pp`
+- `l` - Leaf index `l` as number
+- `rr` - 32 bytes of Root `R` in hex format
+- `o` - Path to JSON file with 32 bytes default size array of Merkle opening `O(l)` in hex format or JSON string with the same contents
+- `k` - Nullifier `k` as a number
+- `r` - Randomness `r` as a number
+- `a` - Recipient address in SS58
+- `t` - Relayer address in SS58
+- `f` - Relayer fee `f` as number 
+- `output-file` - Path to generated file with serialized proof
 
 ## Example of input values:
 - `pp` - test-correct-pp
