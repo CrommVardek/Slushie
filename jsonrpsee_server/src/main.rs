@@ -1,14 +1,16 @@
+pub mod keystore;
 pub mod methods;
+
 use jsonrpsee::{
     core::{server::access_control::AccessControlBuilder, Error},
     http_server::{HttpServerBuilder, HttpServerHandle, RpcModule},
     types::error::CallError,
 };
 use sp_keyring::AccountKeyring;
-use std::{net::SocketAddr, ops::Deref};
+use std::net::SocketAddr;
 use subxt::{ext::sp_core::bytes::from_hex, tx::PairSigner, PolkadotConfig};
 
-use crate::methods::{withdraw, API};
+use crate::methods::withdraw;
 use shared::public_inputs::*;
 
 #[tokio::main]
@@ -96,7 +98,7 @@ async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
         };
         let signer: PairSigner<PolkadotConfig, sp_keyring::sr25519::sr25519::Pair> =
             PairSigner::new(AccountKeyring::Alice.pair());
-        withdraw(API.get().await.deref(), signer, inputs)
+        withdraw(signer, inputs)
             .await
             .map_err(|_| CallError::Failed(anyhow::Error::msg("RPC call failed. ")))?;
 
@@ -124,4 +126,28 @@ async fn run_server() -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     let server_handle = server.start(module)?;
 
     Ok((addr, server_handle))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::run_server;
+    use jsonrpsee::core::client::ClientT;
+    use jsonrpsee::http_client::HttpClientBuilder;
+    use jsonrpsee::rpc_params;
+
+    #[tokio::test]
+    async fn test_client() {
+        let (server_addr, _handle) = run_server().await.unwrap();
+        let url = format!("http://{}", server_addr);
+        let client = HttpClientBuilder::default().build(url).unwrap();
+        let params = rpc_params!(
+            "aaaaaaaaaaaapaaaaaaaaaazaaaaaaaa",
+            "0x4ce946e968a0b477960eef24aafe0997350ba8f168ba2e4a546773556bdd1458",
+            "1",
+            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        );
+        let response: Result<String, _> = client.request("withdraw", params).await;
+
+        assert_eq!("OK".to_string(), response.unwrap())
+    }
 }
