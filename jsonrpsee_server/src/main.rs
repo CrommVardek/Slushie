@@ -1,19 +1,14 @@
-use std::net::SocketAddr;
-use std::ops::Deref;
-
-use async_once::AsyncOnce;
+pub mod methods;
 use jsonrpsee::{
-    core::server::access_control::AccessControlBuilder,
+    core::{server::access_control::AccessControlBuilder, Error},
     http_server::{HttpServerBuilder, HttpServerHandle, RpcModule},
+    types::error::CallError,
 };
-use lazy_static::lazy_static;
-use random_string::generate;
 use sp_keyring::AccountKeyring;
-use subxt::ext::sp_core::bytes::from_hex;
-use subxt::tx::PairSigner;
-use subxt::{Error, OnlineClient, PolkadotConfig};
+use std::{net::SocketAddr, ops::Deref};
+use subxt::{ext::sp_core::bytes::from_hex, tx::PairSigner, PolkadotConfig};
 
-use jsonrpsee_server::withdraw;
+use crate::methods::{withdraw, API};
 use shared::public_inputs::*;
 
 #[tokio::main]
@@ -22,7 +17,6 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .try_init()
         .expect("setting default subscriber failed");
-    let charset = "abcdefghjklmnpoqrstuvyz";
     let (server_addr, _handle) = run_server().await?;
     println!("Run the following snippet in the developer console in any Website.");
     println!(
@@ -33,8 +27,8 @@ async fn main() -> anyhow::Result<()> {
             headers: {{ 'Content-Type': 'application/json' }},
             body: JSON.stringify({{
                 jsonrpc: '2.0',
-                method: 'method_name',
-                params: [{}, root, fee, recipient],
+                method: 'withdraw',
+                params: [nullifier_hash, root, fee, recipient],
                 id: 1
             }})
         }}).then(res => {{
@@ -44,52 +38,75 @@ async fn main() -> anyhow::Result<()> {
             console.log("Response Body:", body)
         }});
     "#,
-        server_addr,
-        generate(32, charset)
+        server_addr
     );
     futures::future::pending().await
 }
-
-lazy_static! {
-    static ref API: AsyncOnce<OnlineClient<PolkadotConfig>> =
-        AsyncOnce::new(async { OnlineClient::<PolkadotConfig>::new().await.unwrap() });
-}
-
-///Create RPC module with registered methods.
+/// Create RPC module with registered methods.
 async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
     let mut module = RpcModule::new(());
 
     module.register_async_method("withdraw", |params, _| async move {
-        let params_vec: Vec<String> = params.parse()?;
+        let mut params_iter = params.parse::<Vec<String>>()?.into_iter();
+
+        let nullifier_hash: PoseidonHash = params_iter
+            .next()
+            .ok_or(CallError::InvalidParams(anyhow::Error::msg(
+                "Nullifier Hash parameter is not provided.",
+            )))?
+            .as_bytes()
+            .try_into()
+            .map_err(|_| {
+                CallError::InvalidParams(anyhow::Error::msg("Invalid nullifier hash parameter."))
+            })?;
+
+        let root = from_hex(&params_iter.next().ok_or(CallError::InvalidParams(
+            anyhow::Error::msg("Root parameter is not provided."),
+        ))?)
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid root parameter.")))?
+        .try_into()
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid root parameter.")))?;
+
+        let proof = [0; 1040];
+
+        let fee = params_iter
+            .next()
+            .ok_or(CallError::InvalidParams(anyhow::Error::msg(
+                "Fee parameter is not provided.",
+            )))?
+            .parse::<u64>()
+            .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid fee parameter.")))?;
+
+        let recipient = params_iter
+            .next()
+            .ok_or(CallError::InvalidParams(anyhow::Error::msg(
+                "Recipient parameter is not provided.",
+            )))?
+            .as_bytes()
+            .try_into()
+            .map_err(|_| {
+                CallError::InvalidParams(anyhow::Error::msg("Invalid recipient parameter."))
+            })?;
         let inputs = WithdrawInputs {
-            nullifier_hash: params_vec[0]
-                .as_bytes()
-                .try_into()
-                .expect("Invalid nullifierHash"),
-
-            root: from_hex(&params_vec[1])
-                .expect("")
-                .try_into()
-                .expect("Invalid root"),
-
-            proof: [0; 1040],
-            fee: params_vec[2].parse::<u64>().expect("Invalid fee"),
-            recipient: params_vec[3].as_bytes().try_into().unwrap(),
+            nullifier_hash,
+            root,
+            proof,
+            fee,
+            recipient,
         };
-
         let signer: PairSigner<PolkadotConfig, sp_keyring::sr25519::sr25519::Pair> =
             PairSigner::new(AccountKeyring::Alice.pair());
         withdraw(API.get().await.deref(), signer, inputs)
             .await
-            .unwrap();
+            .map_err(|_| CallError::Failed(anyhow::Error::msg("RPC call failed. ")))?;
 
-        Ok("good".to_string())
+        Ok("OK".to_string())
     })?;
 
     Ok(module)
 }
 
-///Run server.
+/// Run server.
 async fn run_server() -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     let acl = AccessControlBuilder::new()
         .allow_all_headers()

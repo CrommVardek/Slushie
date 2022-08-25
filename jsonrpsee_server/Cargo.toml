@@ -5,12 +5,11 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-doctest = false
+[[bin]]
+name = "slushie-server"
+path = "src/main.rs"
 
 [dependencies]
-random-string = "1.0"
 anyhow = "1"
 futures = "0.3"
 async_once = "0.2.6"
