@@ -26,8 +26,8 @@ Merkle tree features:
 ### Deposit
 
 To deposit, a user:
-1. Generate two random 32-bit unsigned numbers nullifier (denoted by `k`), randomness (denoted by `r`), and computes commitment (denoted by `C`) such that `C = H(k || n)` 
-2. Send transaction with `N` tokens to contract with data `C` interpreted as 32 bytes array.
+1. Generate two random 32-bit unsigned numbers nullifier (denoted by `k`), randomness (denoted by `r`), and computes commitment (denoted by `C`) such that `C = H(k || n)` (already implemented in [CLI tool](./plonk_prover/README.md))
+2. Send transaction with `N` tokens to contract with data `C` interpreted as 32 bytes array (for now, using [polkadot.js](https://polkadot.js.org/))
 
 If the tree is not full, the contract accepts the transaction, inserts `C` into the tree as a new non-zero leaf and recalculates the path from the last added value and the latest root. The previous root is added to the history array. Also, the contract emits a "Deposited" event, which includes `C` that will be used for finding the leaf index of `C` (denoted by `l`), computing Merkle opening (value of sister nodes on the way from leaf `l` to the root `R`, denoted by `O(l)`) and Merkle path (path from `R` to `l`, denoted by `p(l)`).
 
@@ -35,10 +35,10 @@ If the tree is not full, the contract accepts the transaction, inserts `C` into 
 
 To withdraw a user:
 1. Select an `A` and `f` value such that `f ≤ N`
-2. Select an `R` among the stored ones in the Merkle tree history and compute `O(l)`, `p(l)` 
-3. Compute nullifier hash (denoted by `h`) `h = H(k)`
-4. Generate proof (denoted by `P`)
-5. Send a request to Relayer supplying transaction data `R`, `h`, `A`, `f`, `t`, `P`. Then the Relayer makes a Withdrawal transaction to contract with supplied data.
+2. Select an `R` among the stored ones in the Merkle tree history and compute `O(l)`, `p(l)` (in progress in [CLI tool](./plonk_prover/README.md))
+3. Compute nullifier hash (denoted by `h`) `h = H(k)` (already implemented in [CLI tool](./plonk_prover/README.md))
+4. Generate proof (denoted by `P`) (already implemented in [CLI tool](./plonk_prover/README.md))
+5. Send a request to Relayer supplying transaction data `R`, `h`, `A`, `f`, `t`, `P`. Then the Relayer makes a Withdrawal transaction to contract with supplied data (in progress)
 
 The contract verifies the proof and uniqueness of the nullifier hash to guarantee that proof has not appeared before. If verification successes, it sends `N − f` to `A` and `f` to the `t` and adds `h` to the list of nullifier hashes.
 
@@ -78,6 +78,17 @@ In general, the circuit has such main constraints:
 
 Proof verification function will use `pp`, `R`, `A`, `t`, `f`. Using `pp` and Public inputs, verify proof and then return `true` in a successful case, otherwise, return `false`.
 
+### CLI tool
+
+Slushie provides the helper [CLI tool](./plonk_prover_tool/README.md) that can be used with [polkadot.js](https://polkadot.js.org/) to gain access to all Slushie features.
+The short list of features:
+
+- Commitment generation
+- Getting leaf index `l` using commitment `C` (Command in progress) 
+- Getting root `R` for leaf index `l` (Command in progress) 
+- Generate Merkle opening `O(l)` for `l` (Command in progress) 
+- Proof generation using `l`, `R`, `O(l)`, `k`, `r`
+
 ## Implementation
 
 Slushie is currently implemented as an [ink!-based smart-contract](./slushie/usage.md), [prover library](./plonk_prover/README.md), and the [CLI tool](./plonk_prover_tool/README.md) to generate proofs in the off-chain context.
@@ -93,6 +104,13 @@ Build and deploy as a normal `ink!` contract.
 
 Test normally with `cargo test`.
 Note: the tests may take up to 10 seconds to run.
+
+## Note
+At the moment, Slushie **does not have a trusted setup**.
+
+SRS (Public Parameters) was generated using a random number generator. This method is used for testing and exploration. In this way, knowing these random values would allow anyone to generate invalid proofs which verifiers would accept.
+
+Slushie has trusted setup ceremony in future plans.
 
 ## Credits
 

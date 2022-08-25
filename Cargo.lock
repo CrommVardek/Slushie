@@ -78,6 +78,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1485d4d2cc45e7b201ee3767015c96faa5904387c9d87c6efdd0fb511f12d305"
 
 [[package]]
+name = "arbitrary"
+version = "1.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a7924531f38b1970ff630f03eb20a2fde69db5c590c93b0f3482e95dcc5fd60"
+
+[[package]]
 name = "array-init"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -227,6 +233,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake2b_simd"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55f1c4c39fc0c0109fcb060327f0d971d8f4da24d52e0f7625c1ac91b93d3368"
+dependencies = [
+ "arrayref",
+ "arrayvec 0.4.12",
+ "byteorder",
+ "constant_time_eq",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -303,6 +321,34 @@ name = "bytes"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
+
+[[package]]
+name = "canonical"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f41036ad19cc023afdf392da2f7a9c40773c75df7506b58c2b09df0b285bc97e"
+dependencies = [
+ "arbitrary",
+ "array-init",
+ "blake2b_simd",
+ "cfg-if",
+ "dusk-varint",
+ "lazy_static",
+ "parking_lot",
+]
+
+[[package]]
+name = "canonical_derive"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfbda23541ee38ec80d1feb35999c6a2f79164b47224258e5c4d68ad261d21c5"
+dependencies = [
+ "canonical",
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "cc"
@@ -625,6 +671,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e24fd566c9601db3afc08574e9592bac981d2adeca458439e1f06615f511ce09"
 dependencies = [
  "byteorder",
+ "canonical",
+ "canonical_derive",
  "dusk-bytes",
  "rand_core 0.6.3",
  "rayon",
@@ -656,6 +704,8 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a6097b9d4dc11110f6dea84f7d3594736764a789ce16b17a7a492f5d5926e62"
 dependencies = [
+ "canonical",
+ "canonical_derive",
  "dusk-bls12_381",
  "dusk-bytes",
  "rand_core 0.6.3",
@@ -685,12 +735,22 @@ version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0e7fb23f0e3e9462fa90c4fa2ff8b1c31327944561c30278044ff1db813430c"
 dependencies = [
+ "canonical",
+ "canonical_derive",
  "dusk-bls12_381",
  "dusk-bytes",
  "dusk-hades",
  "dusk-jubjub",
  "dusk-plonk",
+ "microkelvin",
+ "nstack",
 ]
+
+[[package]]
+name = "dusk-varint"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4854efe50874cc251cfa12932d2fc52e1994002eacf4d44c37a1532ebd555414"
 
 [[package]]
 name = "dyn-clonable"
@@ -1850,6 +1910,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "microkelvin"
+version = "0.15.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d554704264dae63d59b0f48871502bffd1bf44cfb294612b9db3aeed83f827"
+dependencies = [
+ "canonical",
+ "canonical_derive",
+ "spin 0.9.4",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1875,6 +1946,17 @@ name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
+
+[[package]]
+name = "nstack"
+version = "0.14.0-rc.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a4b48927cde7b09f71f88ce8e32aa56e7b5a9bd2b31ade18fd8ba919b8d331a"
+dependencies = [
+ "canonical",
+ "canonical_derive",
+ "microkelvin",
+]
 
 [[package]]
 name = "num-bigint"
@@ -2138,8 +2220,12 @@ name = "plonk_prover_tool"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "dusk-bls12_381",
+ "dusk-jubjub",
+ "dusk-poseidon",
  "hex",
  "plonk_prover",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "shared",
@@ -2393,7 +2479,7 @@ dependencies = [
  "cc",
  "libc",
  "once_cell",
- "spin",
+ "spin 0.5.2",
  "untrusted",
  "web-sys",
  "winapi",
@@ -3152,6 +3238,15 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
+
+[[package]]
+name = "spin"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
+dependencies = [
+ "lock_api",
+]
 
 [[package]]
 name = "ss58-registry"

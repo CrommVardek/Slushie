@@ -1,49 +1,28 @@
 mod utils;
-use std::io::Write;
-use std::{fs::File, io::Read, path::Path};
-
 use clap::Parser;
-use sp_core::crypto::{AccountId32, Ss58Codec};
-use utils::*;
 mod commands;
 use commands::*;
-use plonk_prover::prove;
+mod actions;
 
 //size of array that contains keys
 use shared::constants::DEFAULT_DEPTH;
 
-fn generate_proof(args: Args) {
-    let path = Path::new(&args.pp);
-    let mut bytes = Vec::new();
-    let _ = File::open(&path).unwrap().read_to_end(&mut bytes);
-    let a = AccountId32::from_ss58check(&args.a)
-        .expect("Could not convert input to AccountId32")
-        .into();
-    let t = AccountId32::from_ss58check(&args.t)
-        .expect("Could not convert input to AccountId32")
-        .into();
-    let o = parse_tree_openings(&args.o);
-    let rr: [u8; 32] = hex::decode(args.rr).unwrap().try_into().unwrap();
-    let proof =
-        prove(&bytes, args.l, rr, o, args.k, args.r, a, t, args.f).expect("Error generating proof");
-    let mut output_file = File::create(&args.output_file).expect("Unable to create file");
-    output_file
-        .write_all(&proof)
-        .expect("Unable to write proof to file");
-}
 fn main() {
-    generate_proof(Args::parse());
+    let cli = Args::parse();
+    cli.command.do_action();
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::actions::generate_proof;
+
     use super::*;
     #[test]
     fn key_generated() {
-        generate_proof(Args {
+        generate_proof(&Commands::GenerateProof {
             pp: "test-correct-pp".to_string(),
-            rr: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
-            o: r#"[           
+            root: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
+            o: r#"[
                 "8B275561AB29C3EE4FDFF5AA9912AAC193B3A76F474B2C7B0AC60C0B69841AE2",
                 "AE603307AABE14B1685F623B22313F954277762A377CA4D64DBAFEC8F06DBECE",
                 "6BB536DE520D253D0A2C54FE5F186AA799527E29DA190A88234E4A46F7040829",
@@ -78,9 +57,9 @@ mod tests {
 
     #[test]
     fn key_generated_file_json() {
-        generate_proof(Args {
+        generate_proof(&Commands::GenerateProof {
             pp: "test-correct-pp".to_string(),
-            rr: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
+            root: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
             o: "test-json.json".to_string(),
             l: 1,
             k: 3141592653,
@@ -95,10 +74,10 @@ mod tests {
     #[test]
     #[should_panic]
     fn key_not_generated() {
-        generate_proof(Args {
+        generate_proof(&Commands::GenerateProof {
             pp: "test-wrong-pp".to_string(),
-            rr: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
-            o: r#"[           
+            root: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
+            o: r#"[
                 "8B275561AB29C3EE4FDFF5AA9912AAC193B3A76F474B2C7B0AC60C0B69841AE2",
                 "AE603307AABE14B1685F623B22313F954277762A377CA4D64DBAFEC8F06DBECE",
                 "6BB536DE520D253D0A2C54FE5F186AA799527E29DA190A88234E4A46F7040829",

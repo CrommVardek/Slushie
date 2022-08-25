@@ -10,7 +10,7 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
-dusk-bls12_381 = { version = "0.11.0-rc", default-features = false }
+dusk-bls12_381 = { version = "0.11.0", default-features = false }
 
 [dev-dependencies]
 hex-literal = "0.3.4"
