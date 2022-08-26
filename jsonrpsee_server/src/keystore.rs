@@ -7,10 +7,8 @@ fn generate_store() -> Result<LocalKeystore, String> {
         Public::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").unwrap();
     let key_to: LocalKeystore =
         LocalKeystore::open("keystore", None).map_err(|err| err.to_string())?;
-    let insert_key = |key_type, _public| {
-        SyncCryptoStore::insert_unknown(&key_to, key_type, "//Alice", &public_key.0)
-            .map_err(|_| format!("Failed to insert key"))
-    };
+    let _ = SyncCryptoStore::insert_unknown(&key_to, KeyTypeId(*b"sr25"), "//Alice", &public_key.0)
+        .map_err(|_| format!("Failed to add key"));
     Ok(key_to)
 }
 
