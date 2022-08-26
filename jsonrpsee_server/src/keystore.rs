@@ -11,8 +11,6 @@ fn generate_store() -> Result<LocalKeystore, String> {
         SyncCryptoStore::insert_unknown(&key_to, key_type, "//Alice", &public_key.0)
             .map_err(|_| format!("Failed to insert key"))
     };
-    let seed = "//Alice";
-    insert_key(KeyTypeId(*b"sr25"), seed)?;
     Ok(key_to)
 }
 
