@@ -1,29 +1,29 @@
 # JSONRPSEE server
 Arguments:
 
-- `nullifier_hash` - Random 32-bit unsigned numbers generated in CLI
-- `root` - The stored in the Merkle tree history
-- `proof` - Generated proof for transaction also generated in CLI
-- `fee` - Fee
-- `recipient` - Receiver
+- `nullifier_hash` - Ox prefixed hash, e.g. 0x1234 or ASCII data [u8; 32]
+- `root` - History stored in the Merkle Tree (0x prefixed hash, e.g. 0x1234 or ASCII data [u8; 32])
+- `proof` - Generated proof for transaction (0x prefixed hash, e.g. 0x1234 or ASCII data [u8; 32]) 
+- `fee` - Fee (u64)
+- `recipient` - Receiver (AccountID)
 
 ## Main used libraries:
-- [**serde_json**](https://docs.rs/serde_json/1.0.83/serde_json/) for JSON manipulations
-- [**tokio**](https://crates.io/crates/tokio) a runtime for writing reliable, asynchronous, and slim applications
-- [**subxt**]("https://github.com/paritytech/subxt") to call ink! contracts from outside 
-- [**jsonrpsee**](https://docs.rs/jsonrpsee/latest/jsonrpsee/) Create and provide for client and server communication over specific protocols
+- [**serde_json**](https://docs.rs/serde_json/1.0.83/serde_json/) : a framework for serializing and deserializing Rust data structures efficiently and generically.
+- [**tokio**](https://crates.io/crates/tokio) : an event-driven, non-blocking I/O platform for writing asynchronous applications with the Rust programming language.
+- [**subxt**]("https://github.com/paritytech/subxt") :  library to submit extrinsics to a substrate node via RPC. 
+- [**jsonrpsee**](https://docs.rs/jsonrpsee/latest/jsonrpsee/) : JSON-RPC protocol library designed for async/await in Rust. 
 
 ## Run the server:
-For running the server you need to use command:
+To run the server use this command:
 ```bash
 cargo run --release
 ```
 
-For more information how to use cUrl requests in the server: https://www.jsonrpc.org/specification#request_object
+For more information how to use cURL requests in the server: https://www.jsonrpc.org/specification#request_object
 
-example of input values:
+Example of input values:
 
-[**http address generated when server run**] 
+[**HTTP address is generated with the start of the server**] 
 
 - `nullifier_hash` - vpydjyqtbryvuflbjpcuzjtbbthfjymc
 - `root` - 0x4ce946e968a0b477960eef24aafe0997350ba8f168ba2e4a546773556bdd1458
@@ -31,7 +31,7 @@ example of input values:
 - `fee` - any number
 - `recipient` - 5GcSQPCVXrrWDjPXNnajYDqq24qa92V98cSW9xMzosDDnF3 
 
-example of use cUrl requests:
+cURL usage example:
 
 withdraw
 ```bash
