@@ -29,3 +29,4 @@ sp-keystore = { version = "0.12.0", git = "https://github.com/paritytech/substra
 hex = "0.4.3"
 lazy_static = "1.4.0"
 shared = { path = "../shared", default-features = false }
+plonk_prover = { path = "../plonk_prover", features = ["parallel"] }

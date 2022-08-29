@@ -1,8 +1,13 @@
 use async_once::AsyncOnce;
+use jsonrpsee::types::error::CallError;
 use lazy_static::lazy_static;
+use plonk_prover::verify;
 use shared::public_inputs::*;
-use std::ops::Deref;
+use std::error::Error;
+use std::io::Read;
+use std::path::Path;
 use std::str::from_utf8;
+use std::{fs::File, ops::Deref};
 use subxt::{
     ext::{
         sp_core::{blake2_256, H256},
@@ -16,7 +21,7 @@ lazy_static! {
     pub static ref API: AsyncOnce<OnlineClient<PolkadotConfig>> =
         AsyncOnce::new(async { OnlineClient::<PolkadotConfig>::new().await.unwrap() });
 }
-
+use shared::constants::DEFAULT_DEPTH;
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod node_runtime {}
 
@@ -58,9 +63,59 @@ pub async fn withdraw(
     Ok(tx_hash)
 }
 
+fn demo<T>(v: Vec<T>) -> Result<[T; 1040], <[T; 1040] as TryFrom<Vec<T>>>::Error> {
+    v.try_into()
+}
+fn demon<T, const N: usize>(v: Vec<T>) -> [T; N] {
+    v.try_into()
+        .unwrap_or_else(|v: Vec<T>| panic!("Expected a Vec of length {} but it was {}", N, v.len()))
+}
+pub async fn proof_verify(
+    //Nullifier hash
+    h: String,
+    //Root
+    R: String,
+    //Recipient address
+    A: String,
+    //Relayer address
+    t: String,
+    //Fee
+    f: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let public_parameters = include_bytes!("test-correct-pp");
+
+    let recipient = AccountId32::from_ss58check(&A)
+        .expect("Could not convert input to AccountId32")
+        .into();
+    let relayer = AccountId32::from_ss58check(&t)
+        .expect("Could not convert input to AccountId32")
+        .into();
+    let root: [u8; 32] = hex::decode(R).unwrap().try_into().unwrap();
+    let nullifier_hash: [u8; 32] = hex::decode(h).unwrap().try_into().unwrap();
+    let mut bytes_to_hex = Vec::new();
+    File::open("../plonk_prover_tool/test-proof")
+        .unwrap()
+        .read_to_end(&mut bytes_to_hex)
+        .expect("Unable to read proof from file");
+    //let proof_hex = hex::decode(bytes_to_hex);
+    let vec_to_arr = demo(bytes_to_hex);
+    verify::<DEFAULT_DEPTH>(
+        public_parameters,
+        nullifier_hash,
+        root,
+        recipient,
+        relayer,
+        f,
+        &vec_to_arr.unwrap(),
+    )
+    .expect("proof wasn't generated");
+    Ok(())
+}
+
 #[cfg(test)]
 
 mod tests {
+    use super::proof_verify;
     use crate::methods::node_runtime;
     use crate::withdraw;
     use futures::StreamExt;
@@ -71,6 +126,31 @@ mod tests {
     use subxt::tx::PairSigner;
     use subxt::{OnlineClient, PolkadotConfig};
 
+    #[tokio::test]
+    async fn test_proof_verify_correct() {
+        proof_verify(
+            "9D427F77D5A42CD9F2AF53C2AF9B3C81081076D533DE3A550B073281BC93FBA8".to_string(),
+            "8ba12c81e85a2c538113cb85c42886a8ecf46fe8f64daf875f8c1609d7306883".to_string(),
+            "5ChyY5Rrn1ncJvUu77EpVDR6Ze74y1MT2ZSq6mjgMjbFgxda".to_string(),
+            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
+            1,
+        )
+        .await
+        .unwrap();
+    }
+    #[tokio::test]
+    #[should_panic]
+    async fn test_proof_verify_error() {
+        proof_verify(
+            "1".to_string(),
+            "8ba12c81e85a2c538113cb85c42886a8ecf46fe8f64daf875f8c1609d7306883".to_string(),
+            "5ChyY5Rrn1ncJvUu77EpVDR6Ze74y1MT2ZSq6mjgMjbFgxda".to_string(),
+            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
+            1,
+        )
+        .await
+        .unwrap();
+    }
     #[tokio::test]
     async fn test_withdraw() {
         let api = OnlineClient::<PolkadotConfig>::new().await.unwrap();

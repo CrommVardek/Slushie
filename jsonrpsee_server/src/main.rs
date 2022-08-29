@@ -44,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
     );
     futures::future::pending().await
 }
+
 /// Create RPC module with registered methods.
 async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
     let mut module = RpcModule::new(());
