@@ -9,9 +9,8 @@ impl<T: Default + Clone + Copy, const N: usize> Default for Array<T, N> {
 }
 
 /// Generate path from index and tree`s depth
-pub(crate) fn index_to_path<const DEPTH: usize>(
-    index: usize,
-) -> Result<[u8; DEPTH], IndexToPathError> {
+#[cfg(feature = "proof_generator")]
+pub fn index_to_path<const DEPTH: usize>(index: usize) -> Result<[u8; DEPTH], IndexToPathError> {
     let mut result = [0; DEPTH];
 
     if index > (1 << DEPTH) - 1 {
@@ -28,7 +27,8 @@ pub(crate) fn index_to_path<const DEPTH: usize>(
     Ok(result)
 }
 
+#[cfg(feature = "proof_generator")]
 #[derive(Debug)]
-pub(crate) enum IndexToPathError {
+pub enum IndexToPathError {
     WrongIndex,
 }

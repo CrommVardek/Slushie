@@ -33,6 +33,9 @@
 use ink_lang as ink;
 
 mod tree;
+mod utils;
+
+extern crate alloc;
 
 #[allow(clippy::let_unit_value)]
 #[allow(clippy::large_enum_variant)]
@@ -42,10 +45,12 @@ mod slushie {
     use crate::tree::hasher::Poseidon;
     use crate::tree::merkle_tree::{MerkleTree, MerkleTreeError, DEFAULT_ROOT_HISTORY_SIZE};
     use shared::constants::DEFAULT_DEPTH;
+    use utils::*;
 
     type PoseidonHash = [u8; 32];
 
-    const SERIALIZED_PP: &[u8] = include_bytes!("./pp-test");
+    const SERIALIZED_VD: &[u8] = include_bytes!("./vd-test");
+    const SERIALIZED_OPENING_KEY: &[u8; 240] = include_bytes!("./op-key-test");
 
     #[ink(storage)]
     #[derive(ink_storage::traits::SpreadAllocate)]
@@ -103,11 +108,11 @@ mod slushie {
     #[derive(scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct PublicInputs {
-        nullifier_hash: PoseidonHash,
-        root: PoseidonHash,
-        proof: [u8; 1040],
-        fee: u64,
-        recipient: AccountId,
+        pub nullifier_hash: PoseidonHash,
+        pub root: PoseidonHash,
+        pub proof: [u8; 1040],
+        pub fee: u64,
+        pub recipient: AccountId,
     }
 
     pub type Result<T> = core::result::Result<T, Error>;
@@ -180,7 +185,12 @@ mod slushie {
             }
 
             // Check provided proof
-            if !Self::check_proof(SERIALIZED_PP, &public_inputs, self.env().caller()) {
+            if !check_proof(
+                SERIALIZED_VD,
+                SERIALIZED_OPENING_KEY,
+                &public_inputs,
+                self.env().caller(),
+            ) {
                 return Err(Error::VerificationProofFailed);
             }
 
@@ -206,11 +216,6 @@ mod slushie {
         #[ink(message)]
         pub fn get_root_hash(&self) -> PoseidonHash {
             self.merkle_tree.get_last_root() as PoseidonHash
-        }
-
-        //TODO MP-34
-        fn check_proof(_pp: &[u8], _public_inputs: &PublicInputs, _relayer: AccountId) -> bool {
-            true
         }
     }
 

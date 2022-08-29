@@ -1,143 +1,40 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod circuit;
+mod proof_generation;
+mod proof_verification;
 mod utils;
-
-use circuit::*;
-use shared::functions::bytes_to_u64;
-use utils::*;
-
-use dusk_bytes::Serializable;
-use dusk_plonk::prelude::*;
-use dusk_poseidon::sponge;
-use rand_core::OsRng;
 
 #[macro_use]
 extern crate alloc;
 
-#[cfg(target_arch = "wasm32")]
-use alloc::vec::Vec;
+#[cfg(feature = "proof_generator")]
+pub use proof_generation::prove;
 
-#[cfg(target_arch = "wasm32")]
-use alloc::string::ToString;
+#[cfg(feature = "proof_generator")]
+pub use utils::index_to_path;
 
-#[cfg(target_arch = "wasm32")]
-use alloc::format;
+pub use proof_verification::*;
 
-///Depth which is used in Slushie mixer contract
-#[cfg(target_arch = "wasm32")]
-use shared::constants::DEFAULT_DEPTH;
-
-///Constant which should be equal during generating proof and verifying its
-const TRANSCRIPT_INIT: &[u8; 7] = b"slushie";
-
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::wasm_bindgen;
-
-#[cfg(target_arch = "wasm32")]
-use core::array::TryFromSliceError;
-
-///Generation serialized proof which is compatible with js and can be used in frontend
-#[cfg(target_arch = "wasm32")]
-#[allow(clippy::too_many_arguments)]
-#[allow(non_snake_case)]
-#[wasm_bindgen]
-pub fn generate_proof(
-    pp: &[u8],
-    l: usize,
-    R: &[u8],
-    o: &[u8],
-    k: u32,
-    r: u32,
-    A: &[u8],
-    t: &[u8],
-    f: u64,
-) -> Result<Vec<u8>, js_sys::Error> {
-    let mut opening = [[0; 32]; DEFAULT_DEPTH];
-
-    for i in 0..DEFAULT_DEPTH {
-        for j in 0..32 {
-            opening[i][j] = o[i * 32 + j];
-        }
-    }
-
-    let R: PoseidonHash = R
-        .try_into()
-        .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
-    let A: PoseidonHash = A
-        .try_into()
-        .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
-    let t = t
-        .try_into()
-        .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
-
-    prove(pp, l, R, opening, k, r, A, t, f)
-        .map_err(|err| js_sys::Error::new(&format!("{:?}", err)))
-        .map(|proof| proof.into_iter().collect())
-}
-
-///Generation serialized proof
-#[allow(clippy::too_many_arguments)]
-#[allow(non_snake_case)]
-pub fn prove<const DEPTH: usize>(
-    //Public parameters
-    pp: &[u8],
-    //Leaf index
-    l: usize,
-    //Root
-    R: PoseidonHash,
-    //Tree opening
-    o: [PoseidonHash; DEPTH],
-    //Nullifier
-    k: u32,
-    //Randomness
-    r: u32,
-    //Recipient address
-    A: Pubkey,
-    //Relayer address
-    t: Pubkey,
-    //Fee
-    f: u64,
-) -> Result<[u8; 1040], Error> {
-    //Read public parameters
-    let pp = PublicParameters::from_slice(pp)?;
-
-    //Compile circuit
-    let mut circuit = SlushieCircuit::<DEPTH>::default();
-    let (pk, _vd) = circuit.compile(&pp)?;
-
-    //Create circuit
-    let mut circuit = SlushieCircuit::<DEPTH> {
-        R: BlsScalar(bytes_to_u64(R)),
-        r: (r as u64).into(),
-        k: (k as u64).into(),
-        h: sponge::hash(&[(k as u64).into()]),
-        A: BlsScalar::from_raw(bytes_to_u64(A)),
-        t: BlsScalar::from_raw(bytes_to_u64(t)),
-        f: f.into(),
-        o: Array(o),
-        p: Array(index_to_path(l).map_err(|_| Error::ProofVerificationError)?),
-    };
-
-    //Generate proof
-    circuit
-        .prove(&pp, &pk, TRANSCRIPT_INIT, &mut OsRng)
-        .map(|proof| proof.to_bytes())
-}
+pub use circuit::{PoseidonHash, Pubkey};
 
 /// Tests take some time due to proof generating. Recommend running them in release mode with parallel feature
 /// cargo test -r --features parallel  
-/// To run wasm tests:
-/// wasm-pack test --node -r
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
-    use alloc::vec::Vec;
+    use dusk_bytes::Serializable;
     use dusk_plonk::prelude::*;
     use dusk_poseidon::sponge;
     use hex_literal::hex;
+    use rand_core::OsRng;
+    use shared::functions::bytes_to_u64;
+    use shared::functions::scalar_to_bytes;
     use shared::functions::u64_to_bytes;
+
+    use crate::circuit::*;
+    use crate::proof_generation::prove;
+    use crate::utils::index_to_path;
 
     use super::*;
 
@@ -168,9 +65,8 @@ mod tests {
         //Setup public parameters
         let pp = PublicParameters::setup(MAX_DEGREE, &mut OsRng).unwrap();
 
-        //Compile circuit
-        let mut circuit = SlushieCircuit::<DEPTH>::default();
-        let (_dp, dv) = circuit.compile(&pp).unwrap();
+        //Calculate nullifier hash
+        let h = sponge::hash(&[(k as u64).into()]);
 
         //Calculate commitment
         let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);
@@ -188,32 +84,30 @@ mod tests {
         let root = sponge::hash(&[n, o[1]]);
 
         //Generate proof
-        let proof = Proof::from_bytes(
-            &prove(
-                &pp.to_var_bytes(),
-                l,
-                u64_to_bytes(root.0),
-                [u64_to_bytes(o[0].0), u64_to_bytes(o[1].0)],
-                k,
-                r,
-                PAYOUT,
-                RELAYER,
-                f,
-            )
-            .unwrap(),
-        );
+        let proof = &prove(
+            &pp.to_var_bytes(),
+            l,
+            u64_to_bytes(root.0),
+            [u64_to_bytes(o[0].0), u64_to_bytes(o[1].0)],
+            k,
+            r,
+            PAYOUT,
+            RELAYER,
+            f,
+        )
+        .unwrap();
 
-        // Create public inputs
-        let public_inputs: Vec<PublicInputValue> = vec![
-            root.into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
-
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .unwrap();
+        // Verify proof
+        verify::<DEPTH>(
+            &pp.to_var_bytes(),
+            scalar_to_bytes(h),
+            scalar_to_bytes(root),
+            PAYOUT,
+            RELAYER,
+            f,
+            proof,
+        )
+        .unwrap();
     }
 
     /// Test for this situation but with wrong index:
@@ -243,9 +137,8 @@ mod tests {
         //Setup public parameters
         let pp = PublicParameters::setup(MAX_DEGREE, &mut OsRng).unwrap();
 
-        //Compile circuit
-        let mut circuit = SlushieCircuit::<DEPTH>::default();
-        let (_dp, dv) = circuit.compile(&pp).unwrap();
+        //Calculate nullifier hash
+        let h = sponge::hash(&[(k as u64).into()]);
 
         //Calculate commitment
         let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);
@@ -263,51 +156,50 @@ mod tests {
         let root = sponge::hash(&[n, o[1]]);
 
         //Generate proof
-        let proof = Proof::from_bytes(
-            &prove(
-                &pp.to_var_bytes(),
-                l,
-                u64_to_bytes(root.0),
-                [u64_to_bytes(o[0].0), u64_to_bytes(o[1].0)],
-                k,
-                r,
-                PAYOUT,
-                RELAYER,
-                f,
-            )
-            .unwrap(),
-        );
+        let proof = &prove(
+            &pp.to_var_bytes(),
+            l,
+            u64_to_bytes(root.0),
+            [u64_to_bytes(o[0].0), u64_to_bytes(o[1].0)],
+            k,
+            r,
+            PAYOUT,
+            RELAYER,
+            f,
+        )
+        .unwrap();
 
-        // Create public inputs
-        let public_inputs: Vec<PublicInputValue> = vec![
-            root.into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
-
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .expect("ProofVerificationError");
+        // Verify proof
+        verify::<DEPTH>(
+            &pp.to_var_bytes(),
+            scalar_to_bytes(h),
+            scalar_to_bytes(root),
+            PAYOUT,
+            RELAYER,
+            f,
+            proof,
+        )
+        .unwrap();
     }
 
     ///Setup function for every test
-    fn setup<const DEPTH: usize>(
+    fn setup<'a, const DEPTH: usize>(
         k: u32,
         r: u32,
         l: usize,
     ) -> (
-        PublicParameters,
-        VerifierData,
+        &'a [u8],
+        &'a [u8],
+        &'a [u8; OpeningKey::SIZE],
         PoseidonHash,
         [PoseidonHash; DEPTH],
     ) {
         //Setup public parameters from file to reduce tests time
-        let pp = PublicParameters::from_slice(include_bytes!("../pp-test")).unwrap();
+        let pp = include_bytes!("../pp-test");
 
-        //Compile circuit
-        let mut circuit = SlushieCircuit::<DEPTH>::default();
-        let (_dp, dv) = circuit.compile(&pp).unwrap();
+        // Setup verifier data and opening key from file
+        let vd = include_bytes!("../vd-test");
+        let opening_key = include_bytes!("../op-key-test");
 
         //Calculate commitment
         let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);
@@ -316,7 +208,7 @@ mod tests {
         let (R, o) = get_opening(l, commitment);
 
         // Return public parameters, verifier data, root hash and opening
-        (pp, dv, R, o)
+        (pp, vd, opening_key, R, o)
     }
 
     ///Get random opening and root for its
@@ -377,22 +269,13 @@ mod tests {
         let l = rand::random::<u32>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, _vd, _opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
+        let h = sponge::hash(&[(k as u64).into()]);
 
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .unwrap();
+        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
     }
 
     ///Test for checking circuit works with random arguments
@@ -406,22 +289,24 @@ mod tests {
         let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
+        let h = sponge::hash(&[(k as u64).into()]);
 
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .unwrap();
+        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
+        verify_with_vd(
+            vd,
+            opening_key,
+            scalar_to_bytes(h),
+            R,
+            PAYOUT,
+            RELAYER,
+            f,
+            proof,
+        )
+        .unwrap();
     }
 
     ///Test for checking circuit works with wrong fee
@@ -435,21 +320,25 @@ mod tests {
         let l = 8;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
+        let h = sponge::hash(&[(k as u64).into()]);
 
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
+        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof)
+            .or_else(|_| {
+                verify_with_vd(
+                    vd,
+                    opening_key,
+                    scalar_to_bytes(h),
+                    R,
+                    PAYOUT,
+                    RELAYER,
+                    f,
+                    proof,
+                )
+            })
             .expect("ProofVerificationError");
     }
 
@@ -457,145 +346,208 @@ mod tests {
     #[test]
     #[should_panic = "ProofVerificationError"]
     fn wrong_fee() {
-        const DEPTH: usize = 9;
+        const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
         let l = rand::random::<u8>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            // Fee in public inputs is incorrect
-            BlsScalar::from(f + 1).into(),
-        ];
+        let h = sponge::hash(&[(k as u64).into()]);
 
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .expect("ProofVerificationError");
+        verify::<DEPTH>(
+            pp,
+            scalar_to_bytes(h),
+            R,
+            PAYOUT,
+            RELAYER,
+            // Fee is incorrect
+            f + 1,
+            proof,
+        )
+        .or_else(|_| {
+            verify_with_vd(
+                vd,
+                opening_key,
+                scalar_to_bytes(h),
+                R,
+                PAYOUT,
+                RELAYER,
+                // Fee is incorrect
+                f + 1,
+                proof,
+            )
+        })
+        .expect("ProofVerificationError");
     }
 
     ///Test for checking circuit works with wrong nullifier hash
     #[test]
     #[should_panic = "ProofVerificationError"]
     fn wrong_nullifier_hash() {
-        const DEPTH: usize = 10;
+        const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
         let l = rand::random::<u8>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
+        verify::<DEPTH>(
+            pp,
             // Nullifier hash in public inputs is incorrect
-            BlsScalar::zero().into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
-
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .expect("ProofVerificationError");
+            scalar_to_bytes(BlsScalar::zero()),
+            R,
+            PAYOUT,
+            RELAYER,
+            f,
+            proof,
+        )
+        .or_else(|_| {
+            verify_with_vd(
+                vd,
+                opening_key,
+                // Nullifier hash in public inputs is incorrect
+                scalar_to_bytes(BlsScalar::zero()),
+                R,
+                PAYOUT,
+                RELAYER,
+                f,
+                proof,
+            )
+        })
+        .expect("ProofVerificationError");
     }
 
     ///Test for checking circuit works with wrong relayer
     #[test]
     #[should_panic = "ProofVerificationError"]
     fn wrong_relayer() {
-        const DEPTH: usize = 29;
+        const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
         let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
+        let h = sponge::hash(&[(k as u64).into()]);
+
+        verify::<DEPTH>(
+            pp,
+            scalar_to_bytes(h),
+            R,
+            PAYOUT,
             // Relayer in public inputs is incorrect
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from(f).into(),
-        ];
-
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .expect("ProofVerificationError");
+            PAYOUT,
+            f,
+            proof,
+        )
+        .or_else(|_| {
+            verify_with_vd(
+                vd,
+                opening_key,
+                scalar_to_bytes(h),
+                R,
+                PAYOUT,
+                // Relayer in public inputs is incorrect
+                PAYOUT,
+                f,
+                proof,
+            )
+        })
+        .expect("ProofVerificationError");
     }
 
     ///Test for checking circuit works with wrong payout
     #[test]
     #[should_panic = "ProofVerificationError"]
     fn wrong_payout() {
-        const DEPTH: usize = 20;
+        const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
         let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
+        let h = sponge::hash(&[(k as u64).into()]);
+
+        verify::<DEPTH>(
+            pp,
+            scalar_to_bytes(h),
+            R,
             // Payout in public inputs is incorrect
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
-
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .expect("ProofVerificationError");
+            RELAYER,
+            RELAYER,
+            f,
+            proof,
+        )
+        .or_else(|_| {
+            verify_with_vd(
+                vd,
+                opening_key,
+                scalar_to_bytes(h),
+                R,
+                // Payout in public inputs is incorrect
+                RELAYER,
+                RELAYER,
+                f,
+                proof,
+            )
+        })
+        .expect("ProofVerificationError");
     }
 
     ///Test for checking circuit works with wrong root
     #[test]
     #[should_panic = "ProofVerificationError"]
     fn wrong_root() {
-        const DEPTH: usize = 10;
+        const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
         let l = rand::random::<u8>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
+        let h = sponge::hash(&[(k as u64).into()]);
+
+        verify::<DEPTH>(
+            pp,
+            scalar_to_bytes(h),
             // Root in public inputs is incorrect
-            BlsScalar::one().into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from(f).into(),
-        ];
-
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .expect("ProofVerificationError");
+            [0; 32],
+            PAYOUT,
+            RELAYER,
+            f,
+            proof,
+        )
+        .or_else(|_| {
+            verify_with_vd(
+                vd,
+                opening_key,
+                scalar_to_bytes(h),
+                // Root in public inputs is incorrect
+                [0; 32],
+                PAYOUT,
+                RELAYER,
+                f,
+                proof,
+            )
+        })
+        .expect("ProofVerificationError");
     }
 
     ///Test for checking circuit works with wrong opening
@@ -608,25 +560,28 @@ mod tests {
         let l = 10usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, mut o) = setup::<DEPTH>(k, r, l);
+        let (pp, vd, opening_key, R, mut o) = setup::<DEPTH>(k, r, l);
 
         // Opening is incorrect
         o[1] = [0; 32];
 
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f).unwrap(),
-        );
+        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from(f).into(),
-        ];
+        let h = sponge::hash(&[(k as u64).into()]);
 
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
+        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof)
             .expect("ProofVerificationError");
+        verify_with_vd(
+            vd,
+            opening_key,
+            scalar_to_bytes(h),
+            R,
+            PAYOUT,
+            RELAYER,
+            f,
+            proof,
+        )
+        .expect("ProofVerificationError");
     }
 
     ///Test for checking circuit works with wrong opening
@@ -639,7 +594,7 @@ mod tests {
         let l = rand::random::<u32>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, dv, R, mut o) = setup::<DEPTH>(k, r, l);
+        let (pp, _vd, _opening_key, R, mut o) = setup::<DEPTH>(k, r, l);
 
         // Opening is incorrect
         o[10] = [0; 32];
@@ -647,64 +602,11 @@ mod tests {
         // For generating proof with incorrect opening, circuit needs more degree and time,
         // but ProofVerificationError will be in result. To decrease tests time we use
         // PolynomialDegreeTooLarge error during generating proof with incorrect data
-        let proof = Proof::from_bytes(
-            &prove(&pp.to_var_bytes(), l, R, o, k, r, PAYOUT, RELAYER, f)
-                .expect("PolynomialDegreeTooLarge"),
-        );
+        let proof =
+            &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).expect("PolynomialDegreeTooLarge");
 
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from(f).into(),
-        ];
+        let h = sponge::hash(&[(k as u64).into()]);
 
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .unwrap();
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    use wasm_bindgen_test::*;
-
-    ///Test for checking circuit works in wasm
-    #[cfg(target_arch = "wasm32")]
-    #[wasm_bindgen_test]
-    fn generate_proof_test() {
-        const DEPTH: usize = DEFAULT_DEPTH;
-        let k = rand::random::<u32>();
-        let r = rand::random::<u32>();
-        let l = rand::random::<u16>() as usize;
-        let f = rand::random::<u64>();
-
-        let (pp, dv, R, o) = setup::<DEPTH>(k, r, l);
-
-        let proof = Proof::from_bytes(
-            &generate_proof(
-                &pp.to_var_bytes(),
-                l,
-                &R,
-                &o.into_iter().flatten().collect::<Vec<u8>>()[..],
-                k,
-                r,
-                &PAYOUT,
-                &RELAYER,
-                f,
-            )
-            .unwrap()
-            .try_into()
-            .unwrap(),
-        );
-
-        let public_inputs: Vec<PublicInputValue> = vec![
-            BlsScalar(bytes_to_u64(R)).into(),
-            sponge::hash(&[(k as u64).into()]).into(),
-            BlsScalar::from_raw(bytes_to_u64(PAYOUT)).into(),
-            BlsScalar::from_raw(bytes_to_u64(RELAYER)).into(),
-            BlsScalar::from(f).into(),
-        ];
-
-        SlushieCircuit::<DEPTH>::verify(&pp, &dv, &proof.unwrap(), &public_inputs, TRANSCRIPT_INIT)
-            .unwrap();
+        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
     }
 }

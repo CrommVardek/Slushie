@@ -40,7 +40,7 @@ To withdraw a user:
 4. Generate proof (denoted by `P`) (already implemented in [CLI tool](./plonk_prover/README.md))
 5. Send a request to Relayer supplying transaction data `R`, `h`, `A`, `f`, `t`, `P`. Then the Relayer makes a Withdrawal transaction to contract with supplied data (in progress)
 
-The contract verifies the proof and uniqueness of the nullifier hash to guarantee that proof has not appeared before. If verification successes, it sends `N − f` to `A` and `f` to the `t` and adds `h` to the list of nullifier hashes.
+The contract verifies the proof and uniqueness of the nullifier hash to guarantee that proof has not appeared before. If verification succeeds, it sends `N − f` to `A` and `f` to the `t` and adds `h` to the list of nullifier hashes.
 
 ### Zero-knowledge proof scheme
 
@@ -91,7 +91,7 @@ The short list of features:
 
 ## Implementation
 
-Slushie is currently implemented as an [ink!-based smart-contract](./slushie/usage.md), [prover library](./plonk_prover/README.md), and the [CLI tool](./plonk_prover_tool/README.md) to generate proofs in the off-chain context.
+Slushie is currently implemented as an [ink!-based smart-contract](./slushie/usage.md), [prover library](./plonk_prover/README.md), [wasm wrapper on prover library](./slushie_wasm/README.md), and the [CLI tool](./plonk_prover_tool/README.md) to generate proofs in the off-chain context.
 
 Slushie uses [`plonk`](https://github.com/dusk-network/plonk) as the ZKP system and [`poseidon252`](https://github.com/dusk-network/Poseidon252) as the
 Pedersen hash.

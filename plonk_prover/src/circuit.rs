@@ -1,13 +1,19 @@
-use crate::*;
+use crate::utils::Array;
 
 use alloc::vec::Vec;
+use dusk_bytes::Serializable;
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
+use shared::functions::bytes_to_u64;
 
-pub(crate) type PoseidonHash = [u8; 32];
-pub(crate) type Pubkey = [u8; 32];
+pub type PoseidonHash = [u8; 32];
+pub type Pubkey = [u8; 32];
+pub type SerializedProof = [u8; Proof::SIZE];
 
 pub(crate) const CIRCUIT_SIZE: usize = 1 << 16;
+
+///Constant which should be equal during generating proof and verifying its
+pub(crate) const TRANSCRIPT_INIT: &[u8; 7] = b"slushie";
 
 /// Circuit that checks:
 /// 1) poseidonHash(k) = h where h is a Public Input

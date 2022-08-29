@@ -5,4 +5,5 @@ members = [
     "slushie",
     "jsonrpsee_server",
     "shared",
+    "slushie_wasm",
 ]

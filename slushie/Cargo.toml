@@ -24,6 +24,8 @@ dusk-bls12_381 = { version = "0.11.0", default-features = false }
 
 shared = { path = "../shared", default-features = false }
 
+plonk_prover = { path = "../plonk_prover", default-features = false }
+
 [lib]
 name = "slushie"
 path = "lib.rs"

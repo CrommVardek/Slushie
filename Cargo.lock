@@ -2210,12 +2210,9 @@ dependencies = [
  "dusk-poseidon",
  "getrandom 0.2.7",
  "hex-literal",
- "js-sys",
  "rand 0.8.5",
  "rand_core 0.6.3",
  "shared",
- "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -2896,8 +2893,27 @@ dependencies = [
  "ink_primitives",
  "ink_storage",
  "parity-scale-codec",
+ "plonk_prover",
  "scale-info",
  "shared",
+]
+
+[[package]]
+name = "slushie_wasm"
+version = "0.1.0"
+dependencies = [
+ "dusk-bls12_381",
+ "dusk-bytes",
+ "dusk-jubjub",
+ "dusk-plonk",
+ "dusk-poseidon",
+ "hex-literal",
+ "js-sys",
+ "plonk_prover",
+ "rand 0.8.5",
+ "shared",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]

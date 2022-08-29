@@ -1,6 +1,10 @@
-# Generating proof logic
+# Zero-Knowledge Proofs part of Slushie
+The library for manipulating with [`dusk-plonk`](https://github.com/dusk-network/plonk).
 
-The library generates proof for the withdrawal method.
+## Main functions:
+
+### Proof generation
+This function generates serialized plonk proof which will be used in withdraw contract method to verify knowledge of the randomness & nullifier.
 
 Arguments:
 - `pp` - serialized public parameters
@@ -12,6 +16,32 @@ Arguments:
 - `A` - Recipient address
 - `t` - Relayer address
 - `f` - Fee
+
+### Proof verification
+
+The library provides the two verifying techniques:
+- Verification with Public Parameters. This method supposes having access to the Public Parameters. In this way, it can be used with different tree depths due to the inner compiling circuit for certain depths. However, slower and use space for Public Parameters (~3MiB) than the next.
+- Verification without Public Parameters. This method uses precompiled verifier data and the opening key for default Slushie tree depth. Faster and use less space due to using only verifier data(vd-test) and the opening key(op-key-test) (~1.2KiB)
+
+#### Verification with Public Parameters:
+This method is used in [ink!-based smart-contract](./slushie/usage.md) for increasing performance 
+Arguments:
+- `pp` - Serialized public parameters
+- `R` - Root hash
+- `A` - Recipient address
+- `t` - Relayer address
+- `f` - Fee
+- `P` - Generated serialized proof
+
+#### Verification without Public Parameters:
+Arguments:
+- `vd` - Serialized verifier data
+- `opening key` - Opening key
+- `R` - Root hash
+- `A` - Recipient address
+- `t` - Relayer address
+- `f` - Fee
+- `P` - Generated serialized proof
 
 ## Main used libraries:
 
@@ -50,17 +80,7 @@ In the end, the circuit checks that the root hash from public inputs equals the 
 
 Circuit checks that Public inputs, provided for proof generating, are equal to Public inputs provided for proof verification
 
-
-## WASM:
-For a build to wasm:
-- install [wasm-pack](https://rustwasm.github.io/wasm-pack/):
-`cargo install wasm-pack`
-- run this command:
-`wasm-pack build`
-
 ## Test:
 
-Tests take some time due to proof generating. Recommend running them in release mode with parallel feature:
+Tests take some time due to proof generation. Recommend running them in release mode with parallel feature:
 `cargo test -r --features parallel`  
-To run wasm tests:
-`wasm-pack test --node -r`
