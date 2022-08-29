@@ -1,6 +1,7 @@
 use async_once::AsyncOnce;
 use lazy_static::lazy_static;
 use shared::public_inputs::*;
+use std::ops::Deref;
 use std::str::from_utf8;
 use subxt::{
     ext::{
@@ -21,7 +22,6 @@ pub mod node_runtime {}
 
 /// Withdraw tokens.
 pub async fn withdraw(
-    api: &OnlineClient<PolkadotConfig>,
     signer: PairSigner<PolkadotConfig, sp_keyring::sr25519::sr25519::Pair>,
     inputs: WithdrawInputs,
 ) -> Result<H256, Box<dyn std::error::Error>> {
@@ -37,7 +37,7 @@ pub async fn withdraw(
 
     let tx = node_runtime::tx().contracts().call(
         MultiAddress::Id(
-            AccountId32::from_string("5DQZowXVkkcbjjZthsQ98q1uArBUFZ5sMqZyb1Xf4kknoHL6").unwrap(),
+            AccountId32::from_string("5E5NHLcaixpvxJ8y54MQNBwenc29fYb79nsR6AcYV9coXknM").unwrap(),
         ),
         0,
         900_000_000_000,
@@ -46,8 +46,63 @@ pub async fn withdraw(
     );
     let tx_params = Params::new()
         .tip(PlainTip::new(0))
-        .era(Era::Immortal, api.genesis_hash());
+        .era(Era::Immortal, API.get().await.deref().genesis_hash());
 
-    let tx_hash = api.tx().sign_and_submit(&tx, &signer, tx_params).await?;
+    let tx_hash = API
+        .get()
+        .await
+        .deref()
+        .tx()
+        .sign_and_submit(&tx, &signer, tx_params)
+        .await?;
     Ok(tx_hash)
+}
+
+#[cfg(test)]
+
+mod tests {
+    use crate::methods::node_runtime;
+    use crate::withdraw;
+    use futures::StreamExt;
+    use shared::public_inputs::{PoseidonHash, WithdrawInputs};
+    use sp_keyring::AccountKeyring;
+    use subxt::events::Phase::ApplyExtrinsic;
+    use subxt::ext::sp_core::bytes::from_hex;
+    use subxt::tx::PairSigner;
+    use subxt::{OnlineClient, PolkadotConfig};
+
+    #[tokio::test]
+    async fn test_withdraw() {
+        let api = OnlineClient::<PolkadotConfig>::new().await.unwrap();
+        let signer: PairSigner<PolkadotConfig, sp_keyring::sr25519::sr25519::Pair> =
+            PairSigner::new(AccountKeyring::Alice.pair());
+        let inputs = WithdrawInputs {
+            nullifier_hash: PoseidonHash::try_from("aaaaaaaaaaaiaaaaaaaaaaaaaaaaaaaz".as_bytes())
+                .unwrap(),
+            root: from_hex("0x4ce946e968a0b477960eef24aafe0997350ba8f168ba2e4a546773556bdd1458")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            proof: [0; 1040],
+            fee: 1u64,
+            recipient: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+                .as_bytes()
+                .try_into()
+                .unwrap(),
+        };
+        withdraw(signer, inputs).await.unwrap();
+
+        let mut events = api
+            .events()
+            .subscribe()
+            .await
+            .unwrap()
+            .filter_events::<(node_runtime::contracts::events::ContractEmitted,)>();
+
+        let ev = events.next().await.unwrap();
+        let details = ev.unwrap();
+        //How can we get all hashes in specific block&
+        //How can we check our extrinsic in block?
+        assert_eq!(ApplyExtrinsic(1), details.phase);
+    }
 }
