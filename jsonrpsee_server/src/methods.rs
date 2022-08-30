@@ -77,7 +77,7 @@ pub async fn proof_verification(
     let public_parameters = include_bytes!("test-correct-pp");
     let recipient: Pubkey = AccountId32::from_ss58check(&A)
         .map_err(|_| {
-            CallError::InvalidParams(anyhow::Error::msg("Cannot encode recipient parameter."))
+            CallError::InvalidParams(anyhow::Error::msg("Cannot decode recipient parameter."))
         })?
         .try_into()
         .map_err(|_| {
@@ -86,7 +86,7 @@ pub async fn proof_verification(
 
     let relayer: Pubkey = AccountId32::from_ss58check(&t)
         .map_err(|_| {
-            CallError::InvalidParams(anyhow::Error::msg("Cannot encode relayer parameter."))
+            CallError::InvalidParams(anyhow::Error::msg("Cannot decode relayer parameter."))
         })?
         .try_into()
         .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid relayer parameter.")))?;
