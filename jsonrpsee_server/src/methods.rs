@@ -75,18 +75,26 @@ pub async fn proof_verify(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let public_parameters = include_bytes!("test-correct-pp");
     let recipient = AccountId32::from_ss58check(&A)
-        .expect("Could not convert input to AccountId32")
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Could not convert input to AccountId32"))
+        })?
         .into();
     let relayer = AccountId32::from_ss58check(&t)
-        .expect("Could not convert input to AccountId32")
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Could not convert input to AccountId32"))
+        })?
         .into();
     let root: [u8; 32] = hex::decode(R).unwrap().try_into().unwrap();
     let nullifier_hash: [u8; 32] = hex::decode(h).unwrap().try_into().unwrap();
     let mut bytes_to_hex = Vec::new();
     File::open("../plonk_prover_tool/test-proof")
-        .unwrap()
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Unable to open proof from file"))
+        })?
         .read_to_end(&mut bytes_to_hex)
-        .expect("Unable to read proof from file");
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Unable to read proof from file"))
+        })?;
     let vec: Result<[u8; 1040], <[u8; 1040] as TryFrom<Vec<u8>>>::Error> = bytes_to_hex.try_into();
     verify::<DEFAULT_DEPTH>(
         public_parameters,
