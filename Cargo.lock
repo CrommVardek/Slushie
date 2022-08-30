@@ -2853,6 +2853,8 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "dusk-bls12_381",
+ "dusk-bytes",
+ "dusk-plonk",
  "hex-literal",
 ]
 

@@ -1,10 +1,10 @@
 #![cfg(feature = "proof_generator")]
-
 use crate::circuit::*;
 use crate::utils::*;
-use shared::functions::bytes_to_u64;
-
 use dusk_bytes::Serializable;
+use shared::functions::bytes_to_u64;
+use shared::public_types::SerializedProof;
+
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 

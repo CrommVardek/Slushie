@@ -1,11 +1,12 @@
 use async_once::AsyncOnce;
 use jsonrpsee::types::error::CallError;
 use lazy_static::lazy_static;
-use plonk_prover::verify;
-use shared::public_inputs::*;
+use plonk_prover::{verify, Pubkey};
+use shared::{constants::DEFAULT_DEPTH, public_inputs::*, public_types::*};
+use std::fs::File;
 use std::io::Read;
 use std::str::from_utf8;
-use std::{fs::File, ops::Deref};
+use std::{fs, ops::Deref};
 use subxt::{
     ext::{
         sp_core::{blake2_256, H256},
@@ -19,7 +20,6 @@ lazy_static! {
     pub static ref API: AsyncOnce<OnlineClient<PolkadotConfig>> =
         AsyncOnce::new(async { OnlineClient::<PolkadotConfig>::new().await.unwrap() });
 }
-use shared::constants::DEFAULT_DEPTH;
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod node_runtime {}
 
@@ -40,7 +40,7 @@ pub async fn withdraw(
 
     let tx = node_runtime::tx().contracts().call(
         MultiAddress::Id(
-            AccountId32::from_string("5E5NHLcaixpvxJ8y54MQNBwenc29fYb79nsR6AcYV9coXknM").unwrap(),
+            AccountId32::from_string("5E43Yg8EnG52PPy9J2K5ERVt9bXirn3NFPG5r7YABeaKZSZ9").unwrap(),
         ),
         0,
         900_000_000_000,
@@ -61,7 +61,8 @@ pub async fn withdraw(
     Ok(tx_hash)
 }
 
-pub async fn proof_verify(
+/// Proof verification.
+pub async fn proof_verification(
     //Nullifier hash
     h: String,
     //Root
@@ -74,28 +75,45 @@ pub async fn proof_verify(
     f: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let public_parameters = include_bytes!("test-correct-pp");
-    let recipient = AccountId32::from_ss58check(&A)
+    let recipient: Pubkey = AccountId32::from_ss58check(&A)
         .map_err(|_| {
-            CallError::InvalidParams(anyhow::Error::msg("Could not convert input to AccountId32"))
+            CallError::InvalidParams(anyhow::Error::msg("Cannot encode recipient parameter."))
         })?
-        .into();
-    let relayer = AccountId32::from_ss58check(&t)
+        .try_into()
         .map_err(|_| {
-            CallError::InvalidParams(anyhow::Error::msg("Could not convert input to AccountId32"))
-        })?
-        .into();
-    let root: [u8; 32] = hex::decode(R).unwrap().try_into().unwrap();
-    let nullifier_hash: [u8; 32] = hex::decode(h).unwrap().try_into().unwrap();
-    let mut bytes_to_hex = Vec::new();
-    File::open("../plonk_prover_tool/test-proof")
-        .map_err(|_| {
-            CallError::InvalidParams(anyhow::Error::msg("Unable to open proof from file"))
-        })?
-        .read_to_end(&mut bytes_to_hex)
-        .map_err(|_| {
-            CallError::InvalidParams(anyhow::Error::msg("Unable to read proof from file"))
+            CallError::InvalidParams(anyhow::Error::msg("Invalid recipient parameter."))
         })?;
-    let vec: Result<[u8; 1040], <[u8; 1040] as TryFrom<Vec<u8>>>::Error> = bytes_to_hex.try_into();
+
+    let relayer: Pubkey = AccountId32::from_ss58check(&t)
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Cannot encode relayer parameter."))
+        })?
+        .try_into()
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid relayer parameter.")))?;
+
+    let root: [u8; 32] = hex::decode(R)
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Cannot decode root parameter.")))?
+        .try_into()
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid root parameter.")))?;
+
+    let nullifier_hash: [u8; 32] = hex::decode(h)
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg(
+                "Cannot decode nullifier hash parameter.",
+            ))
+        })?
+        .try_into()
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Invalid nullifiier hash parameter."))
+        })?;
+
+    let proof: SerializedProof = fs::read("../plonk_prover_tool/test-proof")
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Unable to read proof from a file."))
+        })?
+        .try_into()
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid proof.")))?;
+
     verify::<DEFAULT_DEPTH>(
         public_parameters,
         nullifier_hash,
@@ -103,7 +121,7 @@ pub async fn proof_verify(
         recipient,
         relayer,
         f,
-        &vec.map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid parameter.")))?,
+        &proof,
     )
     .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid proof.")))?;
     Ok(())
@@ -112,23 +130,24 @@ pub async fn proof_verify(
 #[cfg(test)]
 
 mod tests {
-    use super::proof_verify;
+    use super::proof_verification;
     use crate::methods::node_runtime;
     use crate::withdraw;
     use futures::StreamExt;
-    use shared::public_inputs::{PoseidonHash, WithdrawInputs};
+    use shared::public_inputs::*;
+    use shared::public_types::*;
+    use shared::*;
     use sp_keyring::AccountKeyring;
     use subxt::events::Phase::ApplyExtrinsic;
     use subxt::ext::sp_core::bytes::from_hex;
     use subxt::tx::PairSigner;
     use subxt::{OnlineClient, PolkadotConfig};
-
     #[tokio::test]
-    async fn test_proof_verify_correct() {
-        proof_verify(
-            "9D427F77D5A42CD9F2AF53C2AF9B3C81081076D533DE3A550B073281BC93FBA8".to_string(),
-            "8ba12c81e85a2c538113cb85c42886a8ecf46fe8f64daf875f8c1609d7306883".to_string(),
-            "5ChyY5Rrn1ncJvUu77EpVDR6Ze74y1MT2ZSq6mjgMjbFgxda".to_string(),
+    async fn test_proof_verification_correct() {
+        proof_verification(
+            "29B3E77C5F6A9178BDCA67EEB33F8518F3C3277782698DA356F0384BA8C3E959".to_string(),
+            "9f05ad0d662502e80ff0020a0184f4e3a74e1146fb7346694e49eb6cfeb01a8b".to_string(),
+            "5Gh8pDNFyir6ZdhkvNy2xGtfUNovRjxCzx5oMhhztXhGX3oZ".to_string(),
             "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
             1,
         )
@@ -137,8 +156,8 @@ mod tests {
     }
     #[tokio::test]
     #[should_panic]
-    async fn test_proof_verify_error() {
-        proof_verify(
+    async fn test_proof_verification_error() {
+        proof_verification(
             "1".to_string(),
             "8ba12c81e85a2c538113cb85c42886a8ecf46fe8f64daf875f8c1609d7306883".to_string(),
             "5ChyY5Rrn1ncJvUu77EpVDR6Ze74y1MT2ZSq6mjgMjbFgxda".to_string(),

@@ -11,7 +11,7 @@ use std::net::SocketAddr;
 use subxt::{ext::sp_core::bytes::from_hex, tx::PairSigner, PolkadotConfig};
 
 use crate::methods::withdraw;
-use shared::public_inputs::*;
+use shared::{public_inputs::*, public_types::*};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
