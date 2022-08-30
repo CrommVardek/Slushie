@@ -95,9 +95,9 @@ pub async fn proof_verify(
         recipient,
         relayer,
         f,
-        &vec.expect("proof not have correct format"),
+        &vec.map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid parameter.")))?,
     )
-    .expect("proof wasn't verified");
+    .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid proof.")))?;
     Ok(())
 }
 
