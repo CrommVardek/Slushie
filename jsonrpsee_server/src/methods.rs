@@ -3,9 +3,7 @@ use jsonrpsee::types::error::CallError;
 use lazy_static::lazy_static;
 use plonk_prover::verify;
 use shared::public_inputs::*;
-use std::error::Error;
 use std::io::Read;
-use std::path::Path;
 use std::str::from_utf8;
 use std::{fs::File, ops::Deref};
 use subxt::{
@@ -63,13 +61,6 @@ pub async fn withdraw(
     Ok(tx_hash)
 }
 
-fn demo<T>(v: Vec<T>) -> Result<[T; 1040], <[T; 1040] as TryFrom<Vec<T>>>::Error> {
-    v.try_into()
-}
-fn demon<T, const N: usize>(v: Vec<T>) -> [T; N] {
-    v.try_into()
-        .unwrap_or_else(|v: Vec<T>| panic!("Expected a Vec of length {} but it was {}", N, v.len()))
-}
 pub async fn proof_verify(
     //Nullifier hash
     h: String,
@@ -83,7 +74,6 @@ pub async fn proof_verify(
     f: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let public_parameters = include_bytes!("test-correct-pp");
-
     let recipient = AccountId32::from_ss58check(&A)
         .expect("Could not convert input to AccountId32")
         .into();
@@ -97,8 +87,7 @@ pub async fn proof_verify(
         .unwrap()
         .read_to_end(&mut bytes_to_hex)
         .expect("Unable to read proof from file");
-    //let proof_hex = hex::decode(bytes_to_hex);
-    let vec_to_arr = demo(bytes_to_hex);
+    let vec: Result<[u8; 1040], <[u8; 1040] as TryFrom<Vec<u8>>>::Error> = bytes_to_hex.try_into();
     verify::<DEFAULT_DEPTH>(
         public_parameters,
         nullifier_hash,
@@ -106,9 +95,9 @@ pub async fn proof_verify(
         recipient,
         relayer,
         f,
-        &vec_to_arr.unwrap(),
+        &vec.expect("proof not have correct format"),
     )
-    .expect("proof wasn't generated");
+    .expect("proof wasn't verified");
     Ok(())
 }
 
