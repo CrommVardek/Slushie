@@ -1740,6 +1740,7 @@ dependencies = [
  "jsonrpsee",
  "lazy_static",
  "parity-scale-codec",
+ "plonk_prover",
  "sc-keystore",
  "serde_json",
  "shared",
@@ -2852,6 +2853,8 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "dusk-bls12_381",
+ "dusk-bytes",
+ "dusk-plonk",
  "hex-literal",
 ]
 

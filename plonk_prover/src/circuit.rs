@@ -1,14 +1,12 @@
 use crate::utils::Array;
 
 use alloc::vec::Vec;
-use dusk_bytes::Serializable;
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 use shared::functions::bytes_to_u64;
 
 pub type PoseidonHash = [u8; 32];
 pub type Pubkey = [u8; 32];
-pub type SerializedProof = [u8; Proof::SIZE];
 
 pub(crate) const CIRCUIT_SIZE: usize = 1 << 16;
 

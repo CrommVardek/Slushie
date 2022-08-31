@@ -1,5 +1,4 @@
 use dusk_bls12_381::BlsScalar;
-
 /// Cast bytes array to u64 array
 pub fn bytes_to_u64(bytes: [u8; 32]) -> [u64; 4] {
     let mut result = [0; 4];

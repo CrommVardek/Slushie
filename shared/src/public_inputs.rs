@@ -1,4 +1,5 @@
-pub type PoseidonHash = [u8; 32];
+use crate::public_types::PoseidonHash;
+
 pub struct WithdrawInputs {
     pub nullifier_hash: PoseidonHash,
     pub root: PoseidonHash,
