@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
                          recipient,
                          relayer 
                          ],
-                id: 1 
+                id: 1
             }})
         }}).then(res => {{
             console.log("Response:", res);
