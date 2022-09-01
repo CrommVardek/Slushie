@@ -5,7 +5,7 @@ use shared::public_inputs::WithdrawInputs;
 use sp_core::crypto::{AccountId32, Ss58Codec};
 
 /// Proof verification.
-pub async fn proof_verification(inputs: &WithdrawInputs) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn verify_proof(inputs: &WithdrawInputs) -> Result<(), Box<dyn std::error::Error>> {
     let public_parameters = include_bytes!("test-correct-pp");
 
     let recipient: Pubkey = AccountId32::from_ss58check(&inputs.recipient)
@@ -40,7 +40,7 @@ pub async fn proof_verification(inputs: &WithdrawInputs) -> Result<(), Box<dyn s
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::proof_verification;
+    use crate::utils::verify_proof;
     use shared::public_inputs::WithdrawInputs;
     use shared::public_types::PoseidonHash;
     use subxt::ext::sp_core::bytes::from_hex;
@@ -58,7 +58,7 @@ mod tests {
             recipient: "5Gh8pDNFyir6ZdhkvNy2xGtfUNovRjxCzx5oMhhztXhGX3oZ".to_string(),
             relayer: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
         };
-        assert!(proof_verification(&inputs).await.is_ok());
+        assert!(verify_proof(&inputs).await.is_ok());
     }
 
     #[tokio::test]
@@ -75,6 +75,6 @@ mod tests {
             recipient: "5Gh8pDNFyir6ZdhkvNy2xGtfUNovRjxCzx5oMhhztXhGX3oZ".to_string(),
             relayer: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
         };
-        proof_verification(&inputs).await.unwrap();
+        verify_proof(&inputs).await.unwrap();
     }
 }

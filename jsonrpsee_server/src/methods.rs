@@ -1,4 +1,4 @@
-use crate::utils::proof_verification;
+use crate::utils::verify_proof;
 use anyhow::Error;
 use async_once::AsyncOnce;
 use jsonrpsee::types::error::CallError;
@@ -53,14 +53,15 @@ pub async fn withdraw(
         .tip(PlainTip::new(0))
         .era(Era::Immortal, API.get().await.deref().genesis_hash());
 
-    if proof_verification(&inputs).is_ok() {
+    if verify_proof(&inputs).await.is_ok() {
         let tx_hash = API
             .get()
             .await
             .deref()
             .tx()
             .sign_and_submit(&tx, &signer, tx_params)
-            .await?;
+            .await
+            .map_err(|_| CallError::Failed(anyhow::Error::msg("Transaction failed.")))?;
         return Ok(tx_hash);
     }
 
@@ -73,7 +74,7 @@ pub async fn withdraw(
 
 mod tests {
     use crate::methods::node_runtime;
-    use crate::utils::proof_verification;
+    use crate::utils::verify_proof;
     use crate::withdraw;
     use dusk_bytes::Serializable;
     use futures::StreamExt;
@@ -102,7 +103,7 @@ mod tests {
             relayer: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
         };
 
-        if proof_verification(&inputs).await.is_ok() {
+        if verify_proof(&inputs).await.is_ok() {
             withdraw(signer, inputs).await.unwrap();
         }
 
