@@ -30,3 +30,4 @@ hex = "0.4.3"
 lazy_static = "1.4.0"
 shared = { path = "../shared", default-features = false }
 plonk_prover = { path = "../plonk_prover", features = ["parallel"] }
+dusk-bytes = "0.1"

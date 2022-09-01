@@ -1,5 +1,6 @@
 pub mod keystore;
 pub mod methods;
+pub mod utils;
 
 use jsonrpsee::{
     core::{server::access_control::AccessControlBuilder, Error},
@@ -8,7 +9,8 @@ use jsonrpsee::{
 };
 use sp_keyring::AccountKeyring;
 use std::net::SocketAddr;
-use subxt::{ext::sp_core::bytes::from_hex, tx::PairSigner, PolkadotConfig};
+use subxt::ext::sp_core::bytes::from_hex;
+use subxt::{tx::PairSigner, PolkadotConfig};
 
 use crate::methods::withdraw;
 use shared::{public_inputs::*, public_types::*};
@@ -30,7 +32,13 @@ async fn main() -> anyhow::Result<()> {
             body: JSON.stringify({{
                 jsonrpc: '2.0',
                 method: 'withdraw',
-                params: [nullifier_hash, root, fee, recipient],
+                params: [nullifier_hash,
+                         root,
+                         proof,
+                         fee,
+                         recipient,
+                         relayer 
+                         ],
                 id: 1
             }})
         }}).then(res => {{
@@ -52,27 +60,38 @@ async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
     module.register_async_method("withdraw", |params, _| async move {
         let mut params_iter = params.parse::<Vec<String>>()?.into_iter();
 
-        let nullifier_hash: PoseidonHash = params_iter
-            .next()
-            .ok_or(CallError::InvalidParams(anyhow::Error::msg(
+        let nullifier_hash: PoseidonHash = from_hex(&params_iter.next().ok_or(
+            CallError::InvalidParams(anyhow::Error::msg(
                 "Nullifier Hash parameter is not provided.",
-            )))?
-            .as_bytes()
-            .try_into()
-            .map_err(|_| {
-                CallError::InvalidParams(anyhow::Error::msg("Invalid nullifier hash parameter."))
-            })?;
+            )),
+        )?)
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg(
+                "Cannot decode nullifier hash parameter.",
+            ))
+        })?
+        .try_into()
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Invalid nullifier hash parameter."))
+        })?;
 
-        let root = from_hex(&params_iter.next().ok_or(CallError::InvalidParams(
+        let root: PoseidonHash = from_hex(&params_iter.next().ok_or(CallError::InvalidParams(
             anyhow::Error::msg("Root parameter is not provided."),
         ))?)
-        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid root parameter.")))?
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Cannot decode root parameter.")))?
         .try_into()
         .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid root parameter.")))?;
 
-        let proof = [0; 1040];
+        let proof: SerializedProof = from_hex(&params_iter.next().ok_or(
+            CallError::InvalidParams(anyhow::Error::msg("Proof parameter is not provided.")),
+        )?)
+        .map_err(|_| {
+            CallError::InvalidParams(anyhow::Error::msg("Cannot decode proof parameter."))
+        })?
+        .try_into()
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid proof parameter.")))?;
 
-        let fee = params_iter
+        let fee: u64 = params_iter
             .next()
             .ok_or(CallError::InvalidParams(anyhow::Error::msg(
                 "Fee parameter is not provided.",
@@ -80,23 +99,29 @@ async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
             .parse::<u64>()
             .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid fee parameter.")))?;
 
-        let recipient = params_iter
-            .next()
-            .ok_or(CallError::InvalidParams(anyhow::Error::msg(
-                "Recipient parameter is not provided.",
-            )))?
-            .as_bytes()
-            .try_into()
-            .map_err(|_| {
-                CallError::InvalidParams(anyhow::Error::msg("Invalid recipient parameter."))
-            })?;
+        let recipient: String =
+            params_iter
+                .next()
+                .ok_or(CallError::InvalidParams(anyhow::Error::msg(
+                    "Recipient parameter is not provided.",
+                )))?;
+
+        let relayer: String =
+            params_iter
+                .next()
+                .ok_or(CallError::InvalidParams(anyhow::Error::msg(
+                    "Relayer parameter is not provided.",
+                )))?;
+
         let inputs = WithdrawInputs {
             nullifier_hash,
             root,
             proof,
             fee,
             recipient,
+            relayer,
         };
+
         let signer: PairSigner<PolkadotConfig, sp_keyring::sr25519::sr25519::Pair> =
             PairSigner::new(AccountKeyring::Alice.pair());
         withdraw(signer, inputs)
@@ -135,20 +160,26 @@ mod tests {
     use jsonrpsee::core::client::ClientT;
     use jsonrpsee::http_client::HttpClientBuilder;
     use jsonrpsee::rpc_params;
+    use jsonrpsee::types::error::CallError;
+    use std::fs;
+    use std::str::from_utf8;
 
     #[tokio::test]
     async fn test_client() {
         let (server_addr, _handle) = run_server().await.unwrap();
         let url = format!("http://{}", server_addr);
         let client = HttpClientBuilder::default().build(url).unwrap();
+        let proof = hex::encode(include_bytes!("../test_data/test-proof"));
         let params = rpc_params!(
-            "aaaaaaaaaaaapaaaaaaaaaazaaaaaaaa",
-            "0x4ce946e968a0b477960eef24aafe0997350ba8f168ba2e4a546773556bdd1458",
+            "12E4700B2A16A02D2E5CAF0DD78F09B5162D221A952799E838A3B01BA4AB228C",
+            "ac1d8ce6455937aea84f526141df0967c8bec03c7f47928c5be75fbbe18910b5",
+            proof,
             "1",
+            "5Gh8pDNFyir6ZdhkvNy2xGtfUNovRjxCzx5oMhhztXhGX3oZ",
             "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
         );
-        let response: Result<String, _> = client.request("withdraw", params).await;
 
+        let response: Result<String, _> = client.request("withdraw", params).await;
         assert_eq!("OK".to_string(), response.unwrap())
     }
 }

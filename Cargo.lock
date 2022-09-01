@@ -1735,6 +1735,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async_once",
+ "dusk-bytes",
  "futures",
  "hex",
  "jsonrpsee",
