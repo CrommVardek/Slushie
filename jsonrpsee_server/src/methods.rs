@@ -40,7 +40,7 @@ pub async fn withdraw(
 
     let tx = node_runtime::tx().contracts().call(
         MultiAddress::Id(
-            AccountId32::from_string("5FT7RMg7FfsmGZg2MnrdSgdTbvu4r7ZCYfZLPh8v3iEL2MCP").map_err(
+            AccountId32::from_string("5FrfL6HXGbETXUBegkx7vz7LWQ5MNWRGNYE7PEm1w176nLpz").map_err(
                 |_| CallError::InvalidParams(anyhow::Error::msg("Invalid contract address.")),
             )?,
         ),
