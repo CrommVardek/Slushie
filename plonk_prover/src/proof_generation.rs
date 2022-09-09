@@ -8,7 +8,6 @@ use shared::public_types::SerializedProof;
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 
-#[cfg(feature = "proof_generator")]
 use rand_core::OsRng;
 
 ///Generation serialized proof

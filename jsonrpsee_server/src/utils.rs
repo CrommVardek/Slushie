@@ -1,8 +1,9 @@
 use jsonrpsee::types::error::CallError;
 use plonk_prover::{verify, Pubkey};
 use shared::constants::DEFAULT_DEPTH;
-use shared::public_inputs::WithdrawInputs;
 use sp_core::crypto::{AccountId32, Ss58Codec};
+
+use crate::public_inputs::WithdrawInputs;
 
 /// Proof verification.
 pub async fn verify_proof(inputs: &WithdrawInputs) -> Result<(), Box<dyn std::error::Error>> {
@@ -40,9 +41,7 @@ pub async fn verify_proof(inputs: &WithdrawInputs) -> Result<(), Box<dyn std::er
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::verify_proof;
-    use shared::public_inputs::WithdrawInputs;
-    use shared::public_types::PoseidonHash;
+    use crate::{public_inputs::WithdrawInputs, utils::verify_proof};
     use subxt::ext::sp_core::bytes::from_hex;
 
     #[tokio::test]
@@ -50,12 +49,12 @@ mod tests {
         let proof = hex::encode(include_bytes!("../test_data/test-proof"));
         let inputs = WithdrawInputs {
             nullifier_hash: from_hex(
-                "C109B46908AA04E4E8A1CE89875652A33AEEB662A62E3259314000479132CC15",
+                "2478515297534FF5944224B019B82E8242B325B26624825D639C465B360AFFAF",
             )
             .unwrap()
             .try_into()
             .unwrap(),
-            root: from_hex("e0d769fc156408415cc18bf731e665a60eb2c380fd5c615a347af6350f652a1d")
+            root: from_hex("5c7ad87d1e4f2a604b7d87e398e664a2fecc28c1d2a24f2226b0a9cd257d519a")
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -73,7 +72,7 @@ mod tests {
         let proof = hex::encode(include_bytes!("../test_data/test-proof"));
         let inputs = WithdrawInputs {
             nullifier_hash: from_hex("2").unwrap().try_into().unwrap(),
-            root: from_hex("e0d769fc156408415cc18bf731e665a60eb2c380fd5c615a347af6350f652a1d")
+            root: from_hex("5c7ad87d1e4f2a604b7d87e398e664a2fecc28c1d2a24f2226b0a9cd257d519a")
                 .unwrap()
                 .try_into()
                 .unwrap(),

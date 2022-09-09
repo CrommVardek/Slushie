@@ -1,21 +1,25 @@
-use dusk_bls12_381::BlsScalar;
-use hex_literal::hex;
-use ink_env::hash::{Blake2x256, CryptoHash, HashOutput};
-#[cfg(feature = "std")]
-use ink_storage::traits::StorageLayout;
+#[cfg(feature = "ink")]
 use ink_storage::traits::{PackedLayout, SpreadAllocate, SpreadLayout};
 
-use shared::{
-    constants::MAX_DEPTH,
-    functions::{bytes_to_scalar, u64_to_bytes},
-};
+#[cfg(feature = "ink")]
+use ink_env::hash::{Blake2x256, CryptoHash, HashOutput};
 
+#[cfg(all(feature = "std", feature = "ink"))]
+use ink_storage::traits::StorageLayout;
+
+use dusk_bls12_381::BlsScalar;
+use hex_literal::hex;
+use shared::constants::MAX_DEPTH;
+use shared::functions::{bytes_to_scalar, u64_to_bytes};
+
+#[cfg(feature = "ink")]
 #[derive(
     scale::Encode, scale::Decode, PackedLayout, SpreadAllocate, SpreadLayout, PartialEq, Eq,
 )]
-#[cfg_attr(feature = "std", derive(Debug, ink_storage::traits::StorageLayout))]
+#[cfg_attr(feature = "std", derive(Debug, StorageLayout))]
 pub struct Blake;
 
+#[cfg(feature = "ink")]
 impl MerkleTreeHasher for Blake {
     type Output = <Blake2x256 as HashOutput>::Type;
 
@@ -63,10 +67,21 @@ impl MerkleTreeHasher for Blake {
     ];
 }
 
-#[derive(
-    scale::Encode, scale::Decode, PackedLayout, SpreadAllocate, SpreadLayout, PartialEq, Eq,
+#[derive(PartialEq, Eq)]
+#[cfg_attr(
+    feature = "ink",
+    derive(
+        scale::Encode,
+        scale::Decode,
+        PackedLayout,
+        SpreadAllocate,
+        SpreadLayout,
+    )
 )]
-#[cfg_attr(feature = "std", derive(Debug, ink_storage::traits::StorageLayout))]
+#[cfg_attr(
+    all(feature = "std", feature = "ink"),
+    derive(Debug, ink_storage::traits::StorageLayout)
+)]
 pub struct Poseidon;
 
 impl Poseidon {
@@ -127,8 +142,22 @@ impl MerkleTreeHasher for Poseidon {
     ];
 }
 
-///Trait which require implementation hash for subtrees, MAX_DEPTH zero elements, and hash output
-#[cfg(feature = "std")]
+/// Trait which requires implementation hash for subtrees, MAX_DEPTH zero elements, and hash output
+/// Used in WASM and std without ink
+#[cfg(not(feature = "ink"))]
+pub trait MerkleTreeHasher {
+    type Output: Clone + Copy + PartialEq + Default;
+
+    ///Array with zero elements for a MerkleTree
+    const ZEROS: [Self::Output; MAX_DEPTH];
+
+    /// Calculate hash for provided left and right subtrees
+    fn hash_left_right(left: Self::Output, right: Self::Output) -> Self::Output;
+}
+
+/// Trait which requires implementation hash for subtrees, MAX_DEPTH zero elements, and hash output
+/// Used in ink with std due to the requirement of implementing StorageLayout to generate contract metadata
+#[cfg(all(feature = "std", feature = "ink"))]
 pub trait MerkleTreeHasher:
     scale::Encode + scale::Decode + PackedLayout + SpreadAllocate + SpreadLayout + StorageLayout
 {
@@ -152,8 +181,9 @@ pub trait MerkleTreeHasher:
     fn hash_left_right(left: Self::Output, right: Self::Output) -> Self::Output;
 }
 
-///Trait which require implementation hash for subtrees, MAX_DEPTH zero elements, and hash output
-#[cfg(not(feature = "std"))]
+/// Trait which requires implementation hash for subtrees, MAX_DEPTH zero elements, and hash output
+/// Used in ink without std due to the requirement of implementing SpreadLayout and other ink traits
+#[cfg(all(not(feature = "std"), feature = "ink"))]
 pub trait MerkleTreeHasher:
     scale::Encode + scale::Decode + PackedLayout + SpreadAllocate + SpreadLayout
 {

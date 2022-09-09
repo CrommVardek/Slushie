@@ -6,14 +6,20 @@ edition = "2021"
 
 [dependencies]
 ink_primitives = { version = "3", default-features = false }
-ink_metadata = { version = "3", default-features = false, features = ["derive"], optional = true }
+ink_metadata = { version = "3", default-features = false, features = [
+    "derive",
+], optional = true }
 ink_env = { version = "3", default-features = false }
 ink_storage = { version = "3", default-features = false }
 ink_lang = { version = "3", default-features = false }
 ink_prelude = { version = "3", default-features = false }
 
-scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
-scale-info = { version = "2", default-features = false, features = ["derive"], optional = true }
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
+    "derive",
+] }
+scale-info = { version = "2", default-features = false, features = [
+    "derive",
+], optional = true }
 
 hex-literal = "0.3.4"
 
@@ -24,14 +30,19 @@ dusk-bls12_381 = { version = "0.11.0", default-features = false }
 
 shared = { path = "../shared", default-features = false }
 
-plonk_prover = { path = "../plonk_prover", default-features = false }
+plonk_prover = { path = "../plonk_prover", default-features = false, features = [
+    "ink",
+] }
+
+[dev-dependencies]
+plonk_prover = { path = "../plonk_prover", features = ["ink", "parallel"] }
 
 [lib]
 name = "slushie"
 path = "lib.rs"
 crate-type = [
-	# Used for normal contract Wasm blobs.
-	"cdylib",
+    # Used for normal contract Wasm blobs.
+    "cdylib",
 ]
 
 [features]
@@ -46,5 +57,6 @@ std = [
     "dusk-poseidon/std",
     "dusk-bls12_381/std",
     "shared/default",
+    "plonk_prover/std",
 ]
 ink-as-dependency = []

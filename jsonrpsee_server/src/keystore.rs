@@ -8,7 +8,7 @@ fn generate_store() -> Result<LocalKeystore, String> {
     let key_to: LocalKeystore =
         LocalKeystore::open("keystore", None).map_err(|err| err.to_string())?;
     let _ = SyncCryptoStore::insert_unknown(&key_to, KeyTypeId(*b"sr25"), "//Alice", &public_key.0)
-        .map_err(|_| format!("Failed to add key"));
+        .map_err(|_| "Failed to add key".to_string());
     Ok(key_to)
 }
 
@@ -18,7 +18,7 @@ pub async fn get_public_key(
 ) -> Result<Public, ()> {
     let local_keys = CryptoStore::sr25519_public_keys(&local_keystore, key_type_id).await;
     if !local_keys.is_empty() {
-        Ok(local_keys[0].into())
+        Ok(local_keys[0])
     } else {
         Err(())
     }

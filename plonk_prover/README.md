@@ -43,6 +43,14 @@ Arguments:
 - `f` - Fee
 - `P` - Generated serialized proof
 
+### Generation tree opening
+
+Library provides the interface for creating a Merkle tree from a slice of commitments and generating tree opening using it.
+
+### Commitment generation
+
+This function generates two random 32-bit unsigned numbers nullifier `k`, randomness `r`, and then computes commitment `C` such that `C = H(k || r)` and nullifier hash `k` such that `h = H(k)`.  This command work without parameters.
+
 ## Main used libraries:
 
 - [`dusk-plonk`](https://github.com/dusk-network/plonk) - rust implementation of the PLONK ZKProof System

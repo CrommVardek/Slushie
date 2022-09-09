@@ -14,7 +14,3 @@ sp-core = "6.0.0"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.48"
 hex = "0.4.3"
-rand = { version = "0.8.5", features = ["std_rng"] }
-dusk-bls12_381 = "0.11.0"
-dusk-jubjub = "0.12.0"
-dusk-poseidon = "0.26.0"

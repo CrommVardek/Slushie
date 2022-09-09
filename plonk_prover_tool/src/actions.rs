@@ -5,9 +5,7 @@ use std::{
 };
 
 use hex::ToHex;
-use plonk_prover::prove;
-use rand::{rngs::OsRng, RngCore};
-use shared::functions::scalar_to_bytes;
+use plonk_prover::{prove, GeneratedCommitment};
 use sp_core::crypto::{AccountId32, Ss58Codec};
 
 use crate::{commands::Commands, utils::parse_tree_openings};
@@ -38,7 +36,7 @@ pub(crate) fn generate_proof(args: &Commands) {
 
     // Read serialized pp
     let mut pp_bytes = Vec::new();
-    File::open(&path)
+    File::open(path)
         .unwrap()
         .read_to_end(&mut pp_bytes)
         .expect("Unable to read Public Parameters from file");
@@ -64,7 +62,7 @@ pub(crate) fn generate_proof(args: &Commands) {
 
     // Write serialized proof to file
     let output_file_path = output_file;
-    let mut output_file = File::create(&output_file_path).expect("Unable to create file");
+    let mut output_file = File::create(output_file_path).expect("Unable to create file");
     output_file
         .write_all(&proof)
         .expect("Unable to write proof to file");
@@ -74,28 +72,16 @@ pub(crate) fn generate_proof(args: &Commands) {
 }
 
 pub fn generate_commitment() {
-    // Use OsRng as CSPRNG
-    let mut os_rng = OsRng::default();
-
-    // Generating nullifier and randomness
-    let nullifier = os_rng.next_u32();
-    let randomness = os_rng.next_u32();
-
-    // Compute commitment
-    let commitment =
-        dusk_poseidon::sponge::hash(&[(nullifier as u64).into(), (randomness as u64).into()]);
-
-    // Convert commitment to bytes
-    let commitment_bytes = scalar_to_bytes(commitment);
+    // Generate randomness, nullifier, commitment and nullifier hash
+    let GeneratedCommitment {
+        nullifier,
+        randomness,
+        commitment_bytes,
+        nullifier_hash_bytes,
+    } = plonk_prover::generate_commitment();
 
     // Convert commitment bytes to hex
     let hex_commitment = commitment_bytes.encode_hex_upper::<String>();
-
-    // Compute nullifier hash
-    let nullifier_hash = dusk_poseidon::sponge::hash(&[(nullifier as u64).into()]);
-
-    // Convert nullifier hash to bytes
-    let nullifier_hash_bytes = scalar_to_bytes(nullifier_hash);
 
     // Convert nullifier hash bytes to hex
     let hex_nullifier_hash = nullifier_hash_bytes.encode_hex_upper::<String>();

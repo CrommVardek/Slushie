@@ -29,3 +29,16 @@ dusk-poseidon = { version = "0.26.0-rc.0", default-features = false, features = 
     "alloc",
 ] }
 dusk-bytes = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O3']
+
+[package.metadata.wasm-pack.profile.release.wasm-bindgen]
+debug-js-glue = false
+demangle-name-section = false
+dwarf-debug-info = false

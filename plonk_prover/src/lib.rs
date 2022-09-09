@@ -1,9 +1,14 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod circuit;
+mod commitment_generation;
+pub mod hasher;
 mod proof_generation;
 mod proof_verification;
 mod utils;
+
+#[cfg(feature = "proof_generator")]
+pub mod merkle_tree;
 
 #[macro_use]
 extern crate alloc;
@@ -13,6 +18,9 @@ pub use proof_generation::prove;
 
 #[cfg(feature = "proof_generator")]
 pub use utils::index_to_path;
+
+#[cfg(feature = "proof_generator")]
+pub use commitment_generation::{generate_commitment, GeneratedCommitment};
 
 pub use proof_verification::*;
 

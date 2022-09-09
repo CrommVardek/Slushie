@@ -1,4 +1,4 @@
-use crate::public_types::{PoseidonHash, SerializedProof};
+use shared::public_types::{PoseidonHash, SerializedProof};
 
 pub struct WithdrawInputs {
     pub nullifier_hash: PoseidonHash,

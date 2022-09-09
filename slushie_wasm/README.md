@@ -3,23 +3,37 @@ Library provides WASM wrapper for [prover library](./plonk_prover/README.md) for
 
 ## Available plonk prover functions:
 
+### Generation tree opening
+
+Parameters:
+- Uint8Array commitments - flattened array of commitments
+- number leaf_index -  leaf index `l`
+
+Function returns flattened tree opening `O(l)`:
+Uint8Array opening
+
+### Commitment generation
+
+This function work without parameters.
+The function generates and returns an array of nullifier, randomness, commitment, and nullifier hash.
+
 ### Proof generating
 
 Parameters:
-- Uint8Array pp - Serialized public parameters
-- number l - Leaf index `l`
-- Uint8Array R - Root hash `R`
-- Uint8Array o - Flatten tree opening `O(l)`
-- number k - Nullifier `k`
-- number r - Randomness `r`
-- Uint8Array A - Recipient address `A`
-- Uint8Array t - Relayer address `t`
-- bigint f - Fee `f`
+- Uint8Array pp - serialized public parameters
+- number l - leaf index `l`
+- Uint8Array R - root hash `R`
+- Uint8Array o - flattened tree opening `O(l)`
+- number k - nullifier `k`
+- number r - randomness `r`
+- Uint8Array A - recipient address `A`
+- Uint8Array t - relayer address `t`
+- bigint f - fee `f`
 
 Function returns serialized proof:
 Uint8Array proof
 
-## Building:
+## Build:
 For a build to wasm:
 - install [wasm-pack](https://rustwasm.github.io/wasm-pack/):
 `cargo install wasm-pack`
@@ -31,4 +45,4 @@ To run wasm tests:
 `wasm-pack test --node -r`
 
 ## Note
-Tests take some time due to proof generating.
+Tests take a long time due to proof generation.

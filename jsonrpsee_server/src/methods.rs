@@ -1,9 +1,7 @@
-use crate::utils::verify_proof;
-use anyhow::Error;
+use crate::{utils::verify_proof, public_inputs::WithdrawInputs};
 use async_once::AsyncOnce;
 use jsonrpsee::types::error::CallError;
 use lazy_static::lazy_static;
-use shared::public_inputs::*;
 use std::ops::Deref;
 use subxt::{
     ext::{
@@ -27,7 +25,7 @@ pub async fn withdraw(
     inputs: WithdrawInputs,
 ) -> Result<H256, CallError> {
     let mut call_data = Vec::<u8>::new();
-    call_data.append(&mut (&blake2_256("withdraw".as_bytes())[0..4]).to_vec());
+    call_data.append(&mut blake2_256("withdraw".as_bytes())[0..4].to_vec());
     call_data.append(&mut scale::Encode::encode(&(
         &inputs.nullifier_hash,
         &inputs.root,
@@ -65,22 +63,19 @@ pub async fn withdraw(
         return Ok(tx_hash);
     }
 
-    return Err(CallError::Failed(anyhow::Error::msg(
+    Err(CallError::Failed(anyhow::Error::msg(
         "Transaction canceled due to invalid proof.",
-    )));
+    )))
 }
 
 #[cfg(test)]
 
 mod tests {
     use crate::methods::node_runtime;
+    use crate::public_inputs::WithdrawInputs;
     use crate::utils::verify_proof;
     use crate::withdraw;
-    use dusk_bytes::Serializable;
     use futures::StreamExt;
-    use shared::public_inputs::*;
-    use shared::public_types::*;
-    use shared::*;
     use sp_keyring::AccountKeyring;
     use subxt::events::Phase::ApplyExtrinsic;
     use subxt::ext::sp_core::bytes::from_hex;

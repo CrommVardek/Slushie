@@ -1,5 +1,6 @@
 pub mod keystore;
 pub mod methods;
+pub mod public_inputs;
 pub mod utils;
 
 use jsonrpsee::{
@@ -7,13 +8,14 @@ use jsonrpsee::{
     http_server::{HttpServerBuilder, HttpServerHandle, RpcModule},
     types::error::CallError,
 };
+use public_inputs::WithdrawInputs;
 use sp_keyring::AccountKeyring;
 use std::net::SocketAddr;
 use subxt::ext::sp_core::bytes::from_hex;
 use subxt::{tx::PairSigner, PolkadotConfig};
 
 use crate::methods::withdraw;
-use shared::{public_inputs::*, public_types::*};
+use shared::public_types::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -60,11 +62,11 @@ async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
     module.register_async_method("withdraw", |params, _| async move {
         let mut params_iter = params.parse::<Vec<String>>()?.into_iter();
 
-        let nullifier_hash: PoseidonHash = from_hex(&params_iter.next().ok_or(
+        let nullifier_hash: PoseidonHash = from_hex(&params_iter.next().ok_or_else(|| {
             CallError::InvalidParams(anyhow::Error::msg(
                 "Nullifier Hash parameter is not provided.",
-            )),
-        )?)
+            ))
+        })?)
         .map_err(|_| {
             CallError::InvalidParams(anyhow::Error::msg(
                 "Cannot decode nullifier hash parameter.",
@@ -75,16 +77,16 @@ async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
             CallError::InvalidParams(anyhow::Error::msg("Invalid nullifier hash parameter."))
         })?;
 
-        let root: PoseidonHash = from_hex(&params_iter.next().ok_or(CallError::InvalidParams(
-            anyhow::Error::msg("Root parameter is not provided."),
-        ))?)
+        let root: PoseidonHash = from_hex(&params_iter.next().ok_or_else(|| {
+            CallError::InvalidParams(anyhow::Error::msg("Root parameter is not provided."))
+        })?)
         .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Cannot decode root parameter.")))?
         .try_into()
         .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid root parameter.")))?;
 
-        let proof: SerializedProof = from_hex(&params_iter.next().ok_or(
-            CallError::InvalidParams(anyhow::Error::msg("Proof parameter is not provided.")),
-        )?)
+        let proof: SerializedProof = from_hex(&params_iter.next().ok_or_else(|| {
+            CallError::InvalidParams(anyhow::Error::msg("Proof parameter is not provided."))
+        })?)
         .map_err(|_| {
             CallError::InvalidParams(anyhow::Error::msg("Cannot decode proof parameter."))
         })?
@@ -93,25 +95,19 @@ async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
 
         let fee: u64 = params_iter
             .next()
-            .ok_or(CallError::InvalidParams(anyhow::Error::msg(
-                "Fee parameter is not provided.",
-            )))?
+            .ok_or_else(|| {
+                CallError::InvalidParams(anyhow::Error::msg("Fee parameter is not provided."))
+            })?
             .parse::<u64>()
             .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid fee parameter.")))?;
 
-        let recipient: String =
-            params_iter
-                .next()
-                .ok_or(CallError::InvalidParams(anyhow::Error::msg(
-                    "Recipient parameter is not provided.",
-                )))?;
+        let recipient: String = params_iter.next().ok_or_else(|| {
+            CallError::InvalidParams(anyhow::Error::msg("Recipient parameter is not provided."))
+        })?;
 
-        let relayer: String =
-            params_iter
-                .next()
-                .ok_or(CallError::InvalidParams(anyhow::Error::msg(
-                    "Relayer parameter is not provided.",
-                )))?;
+        let relayer: String = params_iter.next().ok_or_else(|| {
+            CallError::InvalidParams(anyhow::Error::msg("Relayer parameter is not provided."))
+        })?;
 
         let inputs = WithdrawInputs {
             nullifier_hash,
@@ -160,9 +156,6 @@ mod tests {
     use jsonrpsee::core::client::ClientT;
     use jsonrpsee::http_client::HttpClientBuilder;
     use jsonrpsee::rpc_params;
-    use jsonrpsee::types::error::CallError;
-    use std::fs;
-    use std::str::from_utf8;
 
     #[tokio::test]
     async fn test_client() {

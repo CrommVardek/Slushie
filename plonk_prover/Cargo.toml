@@ -20,6 +20,7 @@ dusk-poseidon = { version = "0.26.0", default-features = false, features = [
 ] }
 dusk-bytes = "0.1"
 
+rand = { version = "0.8.5", optional = true }
 hex-literal = "0.3.4"
 rand_core = { version = "0.6", default-features = false, features = [
     "getrandom",
@@ -30,16 +31,50 @@ getrandom = { version = "0.2.7", default-features = false, features = [
 
 shared = { path = "../shared", default-features = false }
 
+ink_storage = { version = "3", default-features = false, optional = true }
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
+    "derive",
+], optional = true }
+scale-info = { version = "2", default-features = false, features = [
+    "derive",
+], optional = true }
+ink_primitives = { version = "3", default-features = false, optional = true }
+ink_env = { version = "3", default-features = false, optional = true }
+ink_metadata = { version = "3", default-features = false, features = [
+    "derive",
+], optional = true }
+
 [dev-dependencies]
 rand = "0.8.5"
 
 [features]
 default = ["proof_generator"]
-proof_generator = ["rand_core", "getrandom"]
+
+# Feature for a proof generation. Can be used in an environment where random is possible. 
+# Used in CLI and WASM but not in a contract
+proof_generator = ["rand_core", "getrandom", "rand"]
+
+# Feature for parallelization proof generation and verification.
+# Used in CLI but not in a contract or WASM
 parallel = [
     "dusk-bls12_381/default",
     "dusk-jubjub/std",
     "dusk-plonk/std",
     "dusk-poseidon/std",
     "shared/default",
+]
+
+# Feature for compatibility with ink!
+ink = ["ink_storage", "scale", "ink_env", "ink_primitives"]
+
+std = [
+    "ink_env/std",
+    "ink_metadata/std",
+    "ink_storage/std",
+    "ink_primitives/std",
+    "scale/std",
+    "dusk-poseidon/std",
+    "dusk-bls12_381/std",
+    "shared/default",
+    "scale-info/std",
 ]

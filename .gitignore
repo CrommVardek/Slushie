@@ -5,3 +5,6 @@
 **/*.rs.bk
 
 plonk_prover_tool/test-proof
+
+node_modules
+yarn.lock

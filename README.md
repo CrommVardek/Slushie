@@ -26,7 +26,7 @@ Merkle tree features:
 ### Deposit
 
 To deposit, a user:
-1. Generate two random 32-bit unsigned numbers nullifier (denoted by `k`), randomness (denoted by `r`), and computes commitment (denoted by `C`) such that `C = H(k || n)` (already implemented in [CLI tool](./plonk_prover/README.md))
+1. Generate two random 32-bit unsigned numbers nullifier (denoted by `k`), randomness (denoted by `r`), and computes commitment (denoted by `C`) such that `C = H(k || r)` (already implemented in [CLI tool](./plonk_prover/README.md))
 2. Send transaction with `N` tokens to contract with data `C` interpreted as 32 bytes array (for now, using [polkadot.js](https://polkadot.js.org/))
 
 If the tree is not full, the contract accepts the transaction, inserts `C` into the tree as a new non-zero leaf and recalculates the path from the last added value and the latest root. The previous root is added to the history array. Also, the contract emits a "Deposited" event, which includes `C` that will be used for finding the leaf index of `C` (denoted by `l`), computing Merkle opening (value of sister nodes on the way from leaf `l` to the root `R`, denoted by `O(l)`) and Merkle path (path from `R` to `l`, denoted by `p(l)`).
@@ -102,8 +102,15 @@ Build and deploy as a normal `ink!` contract.
 
 ## Testing
 
+### Unit tests
 Test normally with `cargo test`.
-Note: the tests may take up to 10 seconds to run.
+However, tests can take some time due to proof generation. To decrease running time you can use `cargo test -r --features parallel  `
+
+### Integration tests
+
+Integration tests using `polkadot.js` and `substrate-contracts-node`
+However, tests take a long time due to proof generation through wasm.
+More about integration tests [here](./tests/README.md)
 
 ## Note
 At the moment, Slushie **does not have a trusted setup**.

@@ -1,10 +1,14 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[macro_use]
 extern crate alloc;
+
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
+use plonk_prover::hasher::Poseidon;
+use plonk_prover::merkle_tree::{MerkleTree, MerkleTreeError};
 ///Depth which is used in Slushie mixer contract
 use shared::constants::DEFAULT_DEPTH;
 
@@ -13,12 +17,13 @@ use plonk_prover::*;
 use core::array::TryFromSliceError;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-///Generation serialized proof which is compatible with js and can be used in frontend
+const SERIALIZED_PUBLIC_PARAMETERS: &[u8] = include_bytes!("../pp-test");
+
+///Generate serialized proof which is compatible with js and can be used in frontend
 #[allow(clippy::too_many_arguments)]
 #[allow(non_snake_case)]
 #[wasm_bindgen]
 pub fn generate_proof(
-    pp: &[u8],
     l: usize,
     R: &[u8],
     o: &[u8],
@@ -28,7 +33,7 @@ pub fn generate_proof(
     t: &[u8],
     f: u64,
 ) -> Result<Vec<u8>, js_sys::Error> {
-    //Reading opening from bytes array
+    //Read opening from bytes array
     let mut opening = [[0; 32]; DEFAULT_DEPTH];
     for i in 0..DEFAULT_DEPTH {
         for j in 0..32 {
@@ -36,11 +41,11 @@ pub fn generate_proof(
         }
     }
 
-    // Parsing arguments
+    // Parse arguments
     let R: PoseidonHash = R
         .try_into()
         .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
-    let A: PoseidonHash = A
+    let A = A
         .try_into()
         .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
     let t = t
@@ -48,9 +53,81 @@ pub fn generate_proof(
         .map_err(|err: TryFromSliceError| js_sys::Error::new(&err.to_string()))?;
 
     //Generate proof
-    prove(pp, l, R, opening, k, r, A, t, f)
+    prove(SERIALIZED_PUBLIC_PARAMETERS, l, R, opening, k, r, A, t, f)
         .map_err(|err| js_sys::Error::new(&format!("{:?}", err)))
         .map(|proof| proof.into_iter().collect())
+}
+
+/// Generate randomness, nullifier, commitment and nullifier hash
+#[wasm_bindgen]
+pub fn generate_commitment() -> js_sys::Array {
+    let GeneratedCommitment {
+        nullifier,
+        randomness,
+        commitment_bytes,
+        nullifier_hash_bytes,
+    } = plonk_prover::generate_commitment();
+
+    // Set nullifier as js number
+    let js_nullifier = js_sys::Number::from(nullifier);
+
+    // Set randomness as js number
+    let js_randomness = js_sys::Number::from(randomness);
+
+    // Set commitment as js Uint8Array
+    let js_commitment = js_sys::Uint8Array::new_with_length(32);
+    js_commitment.copy_from(&commitment_bytes);
+
+    // Set nullifier hash as js Uint8Array
+    let js_nullifier_hash = js_sys::Uint8Array::new_with_length(32);
+    js_nullifier_hash.copy_from(&nullifier_hash_bytes);
+
+    js_sys::Array::of4(
+        &js_nullifier,
+        &js_randomness,
+        &js_commitment,
+        &js_nullifier_hash,
+    )
+}
+
+/// Generate tree opening and path
+#[wasm_bindgen]
+pub fn generate_tree_opening(
+    flat_commitments: &[u8],
+    leaf_index: usize,
+) -> Result<js_sys::Array, js_sys::Error> {
+    //Read commitments from bytes array
+    let mut commitments = vec![[0; 32]; flat_commitments.len() / 32];
+    for i in 0..commitments.len() {
+        for j in 0..32 {
+            commitments[i][j] = flat_commitments[i * 32 + j];
+        }
+    }
+
+    //Create merkle tree
+    let tree: MerkleTree<DEFAULT_DEPTH, Poseidon> = commitments
+        .as_slice()
+        .try_into()
+        .map_err(|err: MerkleTreeError| js_sys::Error::new(&format!("{:?}", err)))?;
+
+    // Get tree opening for leaf index
+    let tree_opening = tree
+        .get_opening(leaf_index)
+        .map_err(|err: MerkleTreeError| js_sys::Error::new(&format!("{:?}", err)))?;
+
+    // Get tree path for leaf index
+    let tree_path = tree
+        .get_path(leaf_index)
+        .map_err(|err: MerkleTreeError| js_sys::Error::new(&format!("{:?}", err)))?;
+
+    // Convert to js types
+    let js_opening = js_sys::Uint8Array::new_with_length(32 * DEFAULT_DEPTH as u32);
+    js_opening.copy_from(&tree_opening.into_iter().flatten().collect::<Vec<u8>>());
+
+    let js_path = js_sys::Uint8Array::new_with_length(DEFAULT_DEPTH as u32);
+    js_path.copy_from(&tree_path);
+
+    Ok(js_sys::Array::of2(&js_opening, &js_path))
 }
 
 /// To run wasm tests:
@@ -59,11 +136,12 @@ pub fn generate_proof(
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
+    use dusk_bytes::Serializable;
     use dusk_plonk::prelude::*;
     use dusk_poseidon::sponge;
     use hex_literal::hex;
     use plonk_prover::index_to_path;
-    use plonk_prover::verify;
+    use plonk_prover::verify_with_vd;
     use plonk_prover::PoseidonHash;
     use plonk_prover::Pubkey;
     use shared::functions::scalar_to_bytes;
@@ -71,13 +149,19 @@ mod tests {
     use wasm_bindgen_test::*;
 
     ///Setup function for every test
-    fn setup<const DEPTH: usize>(
+    fn setup<'a, const DEPTH: usize>(
         k: u32,
         r: u32,
         l: usize,
-    ) -> (PublicParameters, PoseidonHash, [PoseidonHash; DEPTH]) {
-        //Setup public parameters from file to reduce tests time
-        let pp = PublicParameters::from_slice(include_bytes!("../pp-test")).unwrap();
+    ) -> (
+        &'a [u8],
+        &'a [u8; OpeningKey::SIZE],
+        PoseidonHash,
+        [PoseidonHash; DEPTH],
+    ) {
+        // Setup verifier data and opening key from file
+        let vd = include_bytes!("../vd-test");
+        let opening_key = include_bytes!("../op-key-test");
 
         //Calculate commitment
         let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);
@@ -86,7 +170,7 @@ mod tests {
         let (R, o) = get_opening(l, commitment);
 
         // Return public parameters, verifier data, root hash and opening
-        (pp, R, o)
+        (vd, opening_key, R, o)
     }
 
     ///Get random opening and root for its
@@ -144,10 +228,9 @@ mod tests {
         let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, R, o) = setup::<DEPTH>(k, r, l);
+        let (vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
 
         let proof = &generate_proof(
-            &pp.to_var_bytes(),
             l,
             &R,
             &o.into_iter().flatten().collect::<Vec<u8>>()[..],
@@ -163,8 +246,9 @@ mod tests {
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(
-            &pp.to_var_bytes(),
+        verify_with_vd(
+            vd,
+            opening_key,
             scalar_to_bytes(h),
             R,
             PAYOUT,

@@ -4,6 +4,7 @@ use ink_primitives::KeyPtr;
 use ink_storage::traits::{ExtKeyPtr, StorageLayout};
 use ink_storage::traits::{PackedLayout, SpreadAllocate, SpreadLayout};
 
+use plonk_prover::hasher::MerkleTreeHasher;
 /// Merkle tree maximum depth
 use shared::constants::MAX_DEPTH;
 
@@ -139,8 +140,6 @@ pub struct Array<T: Default + Clone + Copy, const N: usize>([T; N]);
 #[cfg(feature = "std")]
 use ink_metadata::layout::{ArrayLayout, Layout, LayoutKey};
 
-use super::hasher::MerkleTreeHasher;
-
 #[cfg(feature = "std")]
 impl<T: Default + Clone + Copy, const N: usize> StorageLayout for Array<T, N>
 where
@@ -168,9 +167,8 @@ impl<T: Default + Clone + Copy, const N: usize> Default for Array<T, N> {
 mod tests {
     use dusk_bls12_381::BlsScalar;
     use ink_env::hash::{Blake2x256, CryptoHash};
+    use plonk_prover::hasher::{Blake, Poseidon};
     use shared::functions::bytes_to_u64;
-
-    use crate::tree::hasher::{Blake, Poseidon};
 
     use super::*;
     const TEST_MAX_DEPTH: usize = 10;

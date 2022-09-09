@@ -42,8 +42,8 @@ extern crate alloc;
 #[ink::contract]
 mod slushie {
     use super::*;
-    use crate::tree::hasher::Poseidon;
     use crate::tree::merkle_tree::{MerkleTree, MerkleTreeError, DEFAULT_ROOT_HISTORY_SIZE};
+    use plonk_prover::hasher::Poseidon;
     use shared::constants::DEFAULT_DEPTH;
     use utils::*;
 
@@ -225,8 +225,11 @@ mod slushie {
         use super::*;
         use hex_literal::hex;
 
+        const SERIALIZED_PUBLIC_PARAMETERS: &[u8] = include_bytes!("./pp-test");
+
         /// Imports `ink_lang` so we can use `#[ink::test]`.
         use ink_lang as ink;
+        use plonk_prover::{prove, GeneratedCommitment};
 
         #[ink::test]
         fn test_constructor() {
@@ -292,8 +295,15 @@ mod slushie {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let deposit_size: Balance = 13;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash =
-                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+
+            let GeneratedCommitment {
+                nullifier,
+                randomness,
+                commitment_bytes,
+                nullifier_hash_bytes,
+            } = plonk_prover::generate_commitment();
+
+            let hash: PoseidonHash = commitment_bytes;
 
             ink_env::test::set_caller::<Environment>(accounts.alice);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
@@ -302,13 +312,31 @@ mod slushie {
 
             let resulting_root_hash = slushie.get_root_hash();
 
+            let tree: plonk_prover::merkle_tree::MerkleTree<DEFAULT_DEPTH, Poseidon> =
+                (&[commitment_bytes][..]).try_into().unwrap();
+
+            let tree_opening = tree.get_opening(0).unwrap();
+
+            let proof = prove(
+                SERIALIZED_PUBLIC_PARAMETERS,
+                0,
+                resulting_root_hash,
+                tree_opening,
+                nullifier,
+                randomness,
+                *accounts.alice.as_ref(),
+                *accounts.alice.as_ref(),
+                20,
+            )
+            .unwrap();
+
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
             let res = slushie.withdraw(PublicInputs {
-                nullifier_hash: hash,
+                nullifier_hash: nullifier_hash_bytes,
                 root: resulting_root_hash,
-                proof: [0; 1040],
-                fee: 0,
-                recipient: accounts.bob,
+                proof,
+                fee: 20,
+                recipient: accounts.alice,
             });
             assert!(res.is_ok());
         }
@@ -319,8 +347,15 @@ mod slushie {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let deposit_size = 13;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash =
-                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+
+            let GeneratedCommitment {
+                nullifier,
+                randomness,
+                commitment_bytes,
+                nullifier_hash_bytes,
+            } = plonk_prover::generate_commitment();
+
+            let hash: PoseidonHash = commitment_bytes;
 
             ink_env::test::set_caller::<Environment>(accounts.alice);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
@@ -329,13 +364,31 @@ mod slushie {
 
             let resulting_root_hash = slushie.get_root_hash();
 
+            let tree: plonk_prover::merkle_tree::MerkleTree<DEFAULT_DEPTH, Poseidon> =
+                (&[commitment_bytes][..]).try_into().unwrap();
+
+            let tree_opening = tree.get_opening(0).unwrap();
+
+            let proof = prove(
+                SERIALIZED_PUBLIC_PARAMETERS,
+                0,
+                resulting_root_hash,
+                tree_opening,
+                nullifier,
+                randomness,
+                *accounts.eve.as_ref(),
+                *accounts.eve.as_ref(),
+                0,
+            )
+            .unwrap();
+
             ink_env::test::set_caller::<Environment>(accounts.eve);
             let res = slushie.withdraw(PublicInputs {
-                nullifier_hash: hash,
+                nullifier_hash: nullifier_hash_bytes,
                 root: resulting_root_hash,
-                proof: [0; 1040],
+                proof,
                 fee: 0,
-                recipient: accounts.bob,
+                recipient: accounts.eve,
             });
             assert!(res.is_ok());
         }
@@ -373,30 +426,56 @@ mod slushie {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             let deposit_size = 13;
             let mut slushie: Slushie = Slushie::new(deposit_size);
-            let hash: PoseidonHash =
-                hex!("0001020304050607 08090a0b0c0d0e0f 0001020304050607 08090a0b0c0d0e0f");
+
+            let GeneratedCommitment {
+                nullifier,
+                randomness,
+                commitment_bytes,
+                nullifier_hash_bytes,
+            } = plonk_prover::generate_commitment();
+
+            let hash: PoseidonHash = commitment_bytes;
 
             ink_env::test::set_caller::<Environment>(accounts.alice);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(deposit_size);
             let res = slushie.deposit(hash);
             assert!(res.is_ok());
+
             let resulting_root_hash = slushie.get_root_hash();
 
+            let tree: plonk_prover::merkle_tree::MerkleTree<DEFAULT_DEPTH, Poseidon> =
+                (&[commitment_bytes][..]).try_into().unwrap();
+
+            let tree_opening = tree.get_opening(0).unwrap();
+
+            let proof = prove(
+                SERIALIZED_PUBLIC_PARAMETERS,
+                0,
+                resulting_root_hash,
+                tree_opening,
+                nullifier,
+                randomness,
+                *accounts.alice.as_ref(),
+                *accounts.alice.as_ref(),
+                10,
+            )
+            .unwrap();
+
             let res = slushie.withdraw(PublicInputs {
-                nullifier_hash: hash,
+                nullifier_hash: nullifier_hash_bytes,
                 root: resulting_root_hash,
-                proof: [0; 1040],
-                fee: 0,
-                recipient: accounts.bob,
+                proof,
+                fee: 10,
+                recipient: accounts.alice,
             });
             assert!(res.is_ok());
 
             let res = slushie.withdraw(PublicInputs {
-                nullifier_hash: hash,
+                nullifier_hash: nullifier_hash_bytes,
                 root: resulting_root_hash,
-                proof: [0; 1040],
-                fee: 0,
-                recipient: accounts.bob,
+                proof,
+                fee: 10,
+                recipient: accounts.alice,
             });
             assert_eq!(res.unwrap_err(), Error::NullifierAlreadyUsed);
         }

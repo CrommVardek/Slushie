@@ -23,7 +23,7 @@ After generating you can use these values in such ways:
 
 ### Commitment generation 
 
-This command generates two random 32-bit unsigned numbers nullifier `k`, randomness `r`, and then computes commitment `C` such that `C = H(k || n)` and nullifier hash `k` such that `h = H(k)`. After that, print all these values. This command work without parameters.
+This command generates two random 32-bit unsigned numbers nullifier `k`, randomness `r`, and then computes commitment `C` such that `C = H(k || r)` and nullifier hash `k` such that `h = H(k)`. After that, print all these values. This command work without parameters.
 
 Example of running this command:
 
