@@ -1,6 +1,7 @@
 use jsonrpsee::types::error::CallError;
-use plonk_prover::{verify, Pubkey};
+use plonk_prover::verify;
 use shared::constants::DEFAULT_DEPTH;
+use shared::public_types::Pubkey;
 use sp_core::crypto::{AccountId32, Ss58Codec};
 
 use crate::public_inputs::WithdrawInputs;

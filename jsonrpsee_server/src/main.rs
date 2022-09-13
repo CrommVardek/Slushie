@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use subxt::ext::sp_core::bytes::from_hex;
 use subxt::{tx::PairSigner, PolkadotConfig};
 
-use crate::methods::withdraw;
+use crate::methods::{flip, withdraw};
 use shared::public_types::*;
 
 #[tokio::main]
@@ -33,14 +33,8 @@ async fn main() -> anyhow::Result<()> {
             headers: {{ 'Content-Type': 'application/json' }},
             body: JSON.stringify({{
                 jsonrpc: '2.0',
-                method: 'withdraw',
-                params: [nullifier_hash,
-                         root,
-                         proof,
-                         fee,
-                         recipient,
-                         relayer 
-                         ],
+                method: 'flip',
+                params: [seed],
                 id: 1
             }})
         }}).then(res => {{
@@ -58,6 +52,20 @@ async fn main() -> anyhow::Result<()> {
 /// Create RPC module with registered methods.
 async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
     let mut module = RpcModule::new(());
+
+    module.register_async_method("flip", |params, _| async move {
+        let mut params_iter = params.parse::<Vec<String>>()?.into_iter();
+        let seed: [u8; 32] = from_hex(&params_iter.next().ok_or(CallError::InvalidParams(
+            anyhow::Error::msg("Seed parameter is not provided."),
+        ))?)
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Cannot decode seed parameter.")))?
+        .try_into()
+        .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid seed parameter.")))?;
+        flip(seed)
+            .await
+            .map_err(|_| CallError::Failed(anyhow::Error::msg("RPC call failed. ")))?;
+        Ok("OK".to_string())
+    })?;
 
     module.register_async_method("withdraw", |params, _| async move {
         let mut params_iter = params.parse::<Vec<String>>()?.into_iter();
@@ -162,17 +170,10 @@ mod tests {
         let (server_addr, _handle) = run_server().await.unwrap();
         let url = format!("http://{}", server_addr);
         let client = HttpClientBuilder::default().build(url).unwrap();
-        let proof = hex::encode(include_bytes!("../test_data/test-proof"));
-        let params = rpc_params!(
-            "12E4700B2A16A02D2E5CAF0DD78F09B5162D221A952799E838A3B01BA4AB228C",
-            "ac1d8ce6455937aea84f526141df0967c8bec03c7f47928c5be75fbbe18910b5",
-            proof,
-            "1",
-            "5Gh8pDNFyir6ZdhkvNy2xGtfUNovRjxCzx5oMhhztXhGX3oZ",
-            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
-        );
+        let params =
+            rpc_params!("0xb945e93a978e6a5ffe7fa2b3f2ef807e8a8c972e2ee3801392adbba37ab6aa48");
 
-        let response: Result<String, _> = client.request("withdraw", params).await;
+        let response: Result<String, _> = client.request("flip", params).await;
         assert_eq!("OK".to_string(), response.unwrap())
     }
 }

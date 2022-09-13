@@ -1,8 +1,11 @@
-use crate::{utils::verify_proof, public_inputs::WithdrawInputs};
+use crate::utils::verify_proof;
+use crate::WithdrawInputs;
 use async_once::AsyncOnce;
 use jsonrpsee::types::error::CallError;
 use lazy_static::lazy_static;
+use sp_keyring::sr25519::sr25519::Pair;
 use std::ops::Deref;
+use subxt::ext::sp_core::Pair as OtherPair;
 use subxt::{
     ext::{
         sp_core::{blake2_256, H256},
@@ -11,14 +14,44 @@ use subxt::{
     tx::{Era, PairSigner, PlainTip, PolkadotExtrinsicParamsBuilder as Params},
     OnlineClient, PolkadotConfig,
 };
-
 lazy_static! {
-    pub static ref API: AsyncOnce<OnlineClient<PolkadotConfig>> =
-        AsyncOnce::new(async { OnlineClient::<PolkadotConfig>::new().await.unwrap() });
+    pub static ref API: AsyncOnce<OnlineClient<PolkadotConfig>> = AsyncOnce::new(async {
+        OnlineClient::<PolkadotConfig>::from_url("wss://rococo-contracts-rpc.polkadot.io:443")
+            .await
+            .unwrap()
+    });
 }
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod node_runtime {}
 
+pub async fn flip(seed: [u8; 32]) -> Result<H256, CallError> {
+    let pair = Pair::from_seed(&seed);
+    let signer: PairSigner<PolkadotConfig, Pair> = PairSigner::new(pair);
+    let mut call_data = Vec::<u8>::new();
+    call_data.append(&mut (&blake2_256("flip".as_bytes())[0..4]).to_vec());
+
+    let tx = node_runtime::tx().contracts().call(
+        MultiAddress::Id(
+            AccountId32::from_string("5Cy84KdQR7CdQhePxF68f669mwjgCX6t93VMHVmrJ4bbiwZM").map_err(
+                |_| CallError::InvalidParams(anyhow::Error::msg("Invalid contract address.")),
+            )?,
+        ),
+        0,
+        20_000_000_000,
+        None,
+        call_data,
+    );
+
+    let tx_hash = API
+        .get()
+        .await
+        .deref()
+        .tx()
+        .sign_and_submit_default(&tx, &signer)
+        .await
+        .unwrap();
+    return Ok(tx_hash);
+}
 /// Withdraw tokens.
 pub async fn withdraw(
     signer: PairSigner<PolkadotConfig, sp_keyring::sr25519::sr25519::Pair>,
@@ -71,7 +104,7 @@ pub async fn withdraw(
 #[cfg(test)]
 
 mod tests {
-    use crate::methods::node_runtime;
+    use crate::methods::{flip, node_runtime};
     use crate::public_inputs::WithdrawInputs;
     use crate::utils::verify_proof;
     use crate::withdraw;
@@ -118,5 +151,16 @@ mod tests {
         let ev = events.next().await.unwrap();
         let details = ev.unwrap();
         assert_eq!(ApplyExtrinsic(1), details.phase);
+    }
+
+    #[tokio::test]
+    async fn test_flip() {
+        let seed: [u8; 32] =
+            from_hex("0xb945e93a978e6a5ffe7fa2b3f2ef807e8a8c972e2ee3801392adbba37ab6aa48")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let result = flip(seed).await;
+        assert!(result.is_ok())
     }
 }
