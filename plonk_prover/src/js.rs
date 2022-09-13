@@ -1,23 +1,23 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
-#[macro_use]
-extern crate alloc;
+#![cfg(feature = "js")]
 
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use plonk_prover::hasher::Poseidon;
-use plonk_prover::merkle_tree::{MerkleTree, MerkleTreeError};
+use crate::hasher::Poseidon;
+use crate::merkle_tree::{MerkleTree, MerkleTreeError};
+
 ///Depth which is used in Slushie mixer contract
 use shared::constants::DEFAULT_DEPTH;
+use shared::public_types::*;
 
-use plonk_prover::*;
+use crate::commitment_generation::{generate_commitment as commitment_gen, GeneratedCommitment};
+use crate::proof_generation::prove;
 
 use core::array::TryFromSliceError;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-const SERIALIZED_PUBLIC_PARAMETERS: &[u8] = include_bytes!("../pp-test");
+const SERIALIZED_PUBLIC_PARAMETERS: &[u8] = include_bytes!("../../public-parameters/pp-test");
 
 ///Generate serialized proof which is compatible with js and can be used in frontend
 #[allow(clippy::too_many_arguments)]
@@ -66,7 +66,7 @@ pub fn generate_commitment() -> js_sys::Array {
         randomness,
         commitment_bytes,
         nullifier_hash_bytes,
-    } = plonk_prover::generate_commitment();
+    } = commitment_gen();
 
     // Set nullifier as js number
     let js_nullifier = js_sys::Number::from(nullifier);
@@ -131,21 +131,19 @@ pub fn generate_tree_opening(
 }
 
 /// To run wasm tests:
-/// wasm-pack test --node -r
+/// wasm-pack test --node -r --features js 
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
+    use crate::proof_verification::verify_with_vd;
+    use crate::utils::index_to_path;
     use alloc::vec::Vec;
     use dusk_bytes::Serializable;
     use dusk_plonk::prelude::*;
     use dusk_poseidon::sponge;
     use hex_literal::hex;
-    use plonk_prover::index_to_path;
-    use plonk_prover::verify_with_vd;
-    use plonk_prover::PoseidonHash;
-    use plonk_prover::Pubkey;
-    use shared::functions::scalar_to_bytes;
-    use shared::functions::u64_to_bytes;
+    use shared::functions::*;
+    use shared::public_types::*;
     use wasm_bindgen_test::*;
 
     ///Setup function for every test
@@ -160,8 +158,8 @@ mod tests {
         [PoseidonHash; DEPTH],
     ) {
         // Setup verifier data and opening key from file
-        let vd = include_bytes!("../vd-test");
-        let opening_key = include_bytes!("../op-key-test");
+        let vd = include_bytes!("../../public-parameters/vd-test");
+        let opening_key = include_bytes!("../../public-parameters/op-key-test");
 
         //Calculate commitment
         let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);

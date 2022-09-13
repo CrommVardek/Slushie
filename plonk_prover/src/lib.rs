@@ -7,24 +7,28 @@ mod proof_generation;
 mod proof_verification;
 mod utils;
 
-#[cfg(feature = "proof_generator")]
+#[cfg(all(feature = "proof_generator"))]
 pub mod merkle_tree;
 
 #[macro_use]
 extern crate alloc;
 
-#[cfg(feature = "proof_generator")]
+#[cfg(all(feature = "proof_generator", not(feature = "js")))]
 pub use proof_generation::prove;
 
-#[cfg(feature = "proof_generator")]
+#[cfg(all(feature = "proof_generator", not(feature = "js")))]
 pub use utils::index_to_path;
 
-#[cfg(feature = "proof_generator")]
+#[cfg(all(feature = "proof_generator", not(feature = "js")))]
 pub use commitment_generation::{generate_commitment, GeneratedCommitment};
 
 pub use proof_verification::*;
 
-pub use circuit::{PoseidonHash, Pubkey};
+#[cfg(feature = "js")]
+mod js;
+
+#[cfg(feature = "js")]
+pub use js::{generate_commitment, generate_proof, generate_tree_opening};
 
 /// Tests take some time due to proof generating. Recommend running them in release mode with parallel feature
 /// cargo test -r --features parallel  
@@ -36,9 +40,8 @@ mod tests {
     use dusk_poseidon::sponge;
     use hex_literal::hex;
     use rand_core::OsRng;
-    use shared::functions::bytes_to_u64;
-    use shared::functions::scalar_to_bytes;
-    use shared::functions::u64_to_bytes;
+    use shared::functions::*;
+    use shared::public_types::*;
 
     use crate::circuit::*;
     use crate::proof_generation::prove;
@@ -203,11 +206,11 @@ mod tests {
         [PoseidonHash; DEPTH],
     ) {
         //Setup public parameters from file to reduce tests time
-        let pp = include_bytes!("../pp-test");
+        let pp = include_bytes!("../../public-parameters/pp-test");
 
         // Setup verifier data and opening key from file
-        let vd = include_bytes!("../vd-test");
-        let opening_key = include_bytes!("../op-key-test");
+        let vd = include_bytes!("../../public-parameters/vd-test");
+        let opening_key = include_bytes!("../../public-parameters/op-key-test");
 
         //Calculate commitment
         let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);

@@ -6,7 +6,7 @@ use dusk_plonk::prelude::*;
 use shared::functions::bytes_to_u64;
 
 use crate::circuit::*;
-use shared::public_types::SerializedProof;
+use shared::public_types::*;
 
 ///Verification serialized proof in cases when public parameters is available
 ///Depth can be custom

@@ -1,6 +1,7 @@
 #![cfg(feature = "proof_generator")]
 
-use crate::{hasher::MerkleTreeHasher, index_to_path};
+use crate::hasher::MerkleTreeHasher;
+use crate::utils::index_to_path;
 
 use alloc::vec::Vec;
 pub struct MerkleTree<const DEPTH: usize, Hash: MerkleTreeHasher> {
@@ -21,7 +22,7 @@ impl<const DEPTH: usize, Hash: MerkleTreeHasher> MerkleTree<DEPTH, Hash> {
                     .ok_or(MerkleTreeError::WrongLeafIndex)?;
             } else {
                 *elem = *self.layers[i]
-                    .get(current_index-1)
+                    .get(current_index - 1)
                     .ok_or(MerkleTreeError::WrongLeafIndex)?;
             }
 

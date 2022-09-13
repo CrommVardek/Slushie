@@ -20,7 +20,7 @@ mod tests {
     #[test]
     fn key_generated() {
         generate_proof(&Commands::GenerateProof {
-            pp: "test-correct-pp".to_string(),
+            pp: "../public-parameters/pp-test".to_string(),
             root: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
             o: r#"[
                 "8B275561AB29C3EE4FDFF5AA9912AAC193B3A76F474B2C7B0AC60C0B69841AE2",
@@ -58,7 +58,7 @@ mod tests {
     #[test]
     fn key_generated_file_json() {
         generate_proof(&Commands::GenerateProof {
-            pp: "test-correct-pp".to_string(),
+            pp: "../public-parameters/pp-test".to_string(),
             root: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
             o: "test-json.json".to_string(),
             l: 1,
@@ -75,7 +75,7 @@ mod tests {
     #[should_panic]
     fn key_not_generated() {
         generate_proof(&Commands::GenerateProof {
-            pp: "test-wrong-pp".to_string(),
+            pp: "../public-parameters/pp-wrong-test".to_string(),
             root: "0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD".to_string(),
             o: r#"[
                 "8B275561AB29C3EE4FDFF5AA9912AAC193B3A76F474B2C7B0AC60C0B69841AE2",

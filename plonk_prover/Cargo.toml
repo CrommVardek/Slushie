@@ -8,6 +8,7 @@ edition = "2021"
 
 [lib]
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dusk-bls12_381 = { version = "0.11.0", default-features = false }
@@ -44,8 +45,12 @@ ink_metadata = { version = "3", default-features = false, features = [
     "derive",
 ], optional = true }
 
+wasm-bindgen = { version = "0.2.33", optional = true }
+js-sys = { version = "0.3.59", optional = true }
+
 [dev-dependencies]
 rand = "0.8.5"
+wasm-bindgen-test = "0.3.0"
 
 [features]
 default = ["proof_generator"]
@@ -67,6 +72,8 @@ parallel = [
 # Feature for compatibility with ink!
 ink = ["ink_storage", "scale", "ink_env", "ink_primitives"]
 
+js = ["wasm-bindgen", "js-sys", "proof_generator"]
+
 std = [
     "ink_env/std",
     "ink_metadata/std",
@@ -78,3 +85,16 @@ std = [
     "shared/default",
     "scale-info/std",
 ]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O3']
+
+[package.metadata.wasm-pack.profile.release.wasm-bindgen]
+debug-js-glue = false
+demangle-name-section = false
+dwarf-debug-info = false

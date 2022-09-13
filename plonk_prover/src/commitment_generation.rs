@@ -3,8 +3,7 @@
 use rand::RngCore;
 use rand_core::OsRng;
 use shared::functions::scalar_to_bytes;
-
-use crate::PoseidonHash;
+use shared::public_types::*;
 
 /// Generate randomness, nullifier, commitment and nullifier hash
 pub fn generate_commitment() -> GeneratedCommitment {

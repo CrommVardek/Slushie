@@ -3,7 +3,7 @@ use crate::circuit::*;
 use crate::utils::*;
 use dusk_bytes::Serializable;
 use shared::functions::bytes_to_u64;
-use shared::public_types::SerializedProof;
+use shared::public_types::*;
 
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;

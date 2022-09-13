@@ -49,8 +49,8 @@ mod slushie {
 
     type PoseidonHash = [u8; 32];
 
-    const SERIALIZED_VD: &[u8] = include_bytes!("./vd-test");
-    const SERIALIZED_OPENING_KEY: &[u8; 240] = include_bytes!("./op-key-test");
+    const SERIALIZED_VD: &[u8] = include_bytes!("../public-parameters/vd-test");
+    const SERIALIZED_OPENING_KEY: &[u8; 240] = include_bytes!("../public-parameters/op-key-test");
 
     #[ink(storage)]
     #[derive(ink_storage::traits::SpreadAllocate)]
@@ -225,7 +225,7 @@ mod slushie {
         use super::*;
         use hex_literal::hex;
 
-        const SERIALIZED_PUBLIC_PARAMETERS: &[u8] = include_bytes!("./pp-test");
+        const SERIALIZED_PUBLIC_PARAMETERS: &[u8] = include_bytes!("../public-parameters/pp-test");
 
         /// Imports `ink_lang` so we can use `#[ink::test]`.
         use ink_lang as ink;
