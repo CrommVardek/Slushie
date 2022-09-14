@@ -55,9 +55,9 @@ async fn setup_rpc_module() -> Result<RpcModule<()>, Error> {
 
     module.register_async_method("flip", |params, _| async move {
         let mut params_iter = params.parse::<Vec<String>>()?.into_iter();
-        let seed: [u8; 32] = from_hex(&params_iter.next().ok_or(CallError::InvalidParams(
-            anyhow::Error::msg("Seed parameter is not provided."),
-        ))?)
+        let seed: [u8; 32] = from_hex(&params_iter.next().ok_or_else(|| {
+            CallError::InvalidParams(anyhow::Error::msg("Seed parameter is not provided."))
+        })?)
         .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Cannot decode seed parameter.")))?
         .try_into()
         .map_err(|_| CallError::InvalidParams(anyhow::Error::msg("Invalid seed parameter.")))?;

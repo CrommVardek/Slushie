@@ -1678,6 +1678,7 @@ dependencies = [
  "dusk-bytes",
  "futures",
  "hex",
+ "hex-literal",
  "jsonrpsee",
  "lazy_static",
  "parity-scale-codec",

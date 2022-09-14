@@ -28,7 +28,7 @@ pub async fn flip(seed: [u8; 32]) -> Result<H256, CallError> {
     let pair = Pair::from_seed(&seed);
     let signer: PairSigner<PolkadotConfig, Pair> = PairSigner::new(pair);
     let mut call_data = Vec::<u8>::new();
-    call_data.append(&mut (&blake2_256("flip".as_bytes())[0..4]).to_vec());
+    call_data.append(&mut blake2_256("flip".as_bytes())[0..4].to_vec());
 
     let tx = node_runtime::tx().contracts().call(
         MultiAddress::Id(
@@ -50,7 +50,7 @@ pub async fn flip(seed: [u8; 32]) -> Result<H256, CallError> {
         .sign_and_submit_default(&tx, &signer)
         .await
         .unwrap();
-    return Ok(tx_hash);
+    Ok(tx_hash)
 }
 /// Withdraw tokens.
 pub async fn withdraw(
