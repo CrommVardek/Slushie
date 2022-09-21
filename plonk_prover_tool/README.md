@@ -48,12 +48,48 @@ For generating proof this tool uses these arguments:
 Example of running this command:
 
 ```bash
-cargo run -r  -- generate-proof --pp test-correct-pp --l 1 --root 0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD --o test-json.json --k 3141592653 --r 1 --a 5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK --t 5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK --f 1 --output-file test-proof
+cargo run -r  -- generate-proof --pp ../public-parameters/pp-test --l 1 --root 0EDB120C1F24145A221C3B77D15ABC9959956FBE7E3B37832166CCB7ADE0CFCD --o test-json.json --k 3141592653 --r 1 --a 5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK --t 5DtCbNMGwhnP5wJ25Zv59wc5aj5uo3wYdr8536qSRxbvmLdK --f 1 --output-file test-proof
 ```
+
+### Public parameters generation
+
+For generating Public parameters this tool uses these arguments:
+
+- `output-pp` - Path to output file with serialized Public Parameters `pp`, which are hardcoded for now in the `test-correct-pp` file and later will be generated from a trusted setup ceremony
+
+```bash
+ cargo run -r -- generate-test-public-parameters --output-pp ./pp 
+```
+
+### Verifier data generation
+
+For generating verifier data this tool uses these arguments:
+
+- `pp` - Path to file with serialized Public Parameters `pp`, which are hardcoded for now in the `test-correct-pp` file and later will be generated from a trusted setup ceremony
+- `output-vd` - Path to output file with serialized verifier data
+- `output-ok` - Path to output file with serialized opening key
+
+```bash
+cargo run -r -- generate-verifier-data --pp ../public-parameters/pp-test --output-vd ../public-parameters/vd-test --output-ok  ../public-parameters/opening-key-test
+```
+
+### Prover data generation
+
+For generating prover data this tool uses these arguments:
+
+- `pp` - Path to file with serialized Public Parameters `pp`, which are hardcoded for now in the `test-correct-pp` file and later will be generated from a trusted setup ceremony
+- `output-pd` - Path to output file with serialized prover data
+- `output-ck` - Path to output file with serialized commit key
+
+```bash
+cargo run -r -- generate-prover-data --pp ../public-parameters/pp-test --output-pd ../public-parameters/pd-test --output-ck  ../public-parameters/commit-key-test
+```
+
 
 ### Get leaf index
 
 Command in progress
+
 ### Get root
 
 Command in progress

@@ -5,9 +5,13 @@ The library for manipulating with [`dusk-plonk`](https://github.com/dusk-network
 
 ### Proof generation
 This function generates serialized plonk proof which will be used in withdraw contract method to verify knowledge of the randomness & nullifier.
+The library provides the two generating techniques:
+- Generation with Public Parameters. This method supposes having access to the Public Parameters. In this way, it can be used with different tree depths due to the inner compiling circuit for certain depths. However, slower than the next.
+- Generation without Public Parameters. This method uses precompiled prover data and commit key for default Slushie tree depth. Faster, but use more space due to using prover data
 
+#### Generation with Public Parameters:
 Arguments:
-- `pp` - serialized public parameters
+- `pp` - Serialized public parameters
 - `l` - Leaf index
 - `R` - root hash
 - `o` - Tree opening (value of sister nodes on the way from leaf l to the root R)
@@ -17,9 +21,35 @@ Arguments:
 - `t` - Relayer address
 - `f` - Fee
 
-#### JS Compatibility
+##### JS Compatibility
 Parameters:
-- Uint8Array pp - serialized public parameters
+- number l - leaf index `l`
+- Uint8Array R - root hash `R`
+- Uint8Array o - flattened tree opening `O(l)`
+- number k - nullifier `k`
+- number r - randomness `r`
+- Uint8Array A - recipient address `A`
+- Uint8Array t - relayer address `t`
+- bigint f - fee `f`
+
+Function returns serialized proof:
+Uint8Array proof
+
+#### Generation without Public Parameters:
+Arguments:
+- `pd` - Serialized prover data
+- `ck` - Serialized commit key
+- `l` - Leaf index
+- `R` - root hash
+- `o` - Tree opening (value of sister nodes on the way from leaf l to the root R)
+- `k` - Nullifier
+- `r` - Randomness
+- `A` - Recipient address
+- `t` - Relayer address
+- `f` - Fee
+
+##### JS Compatibility
+Parameters:
 - number l - leaf index `l`
 - Uint8Array R - root hash `R`
 - Uint8Array o - flattened tree opening `O(l)`
@@ -36,10 +66,10 @@ Uint8Array proof
 
 The library provides the two verifying techniques:
 - Verification with Public Parameters. This method supposes having access to the Public Parameters. In this way, it can be used with different tree depths due to the inner compiling circuit for certain depths. However, slower and use space for Public Parameters (~3MiB) than the next.
-- Verification without Public Parameters. This method uses precompiled verifier data and the opening key for default Slushie tree depth. Faster and use less space due to using only verifier data(vd-test) and the opening key(op-key-test) (~1.2KiB)
+- Verification without Public Parameters. This method uses precompiled verifier data and opening key for default Slushie tree depth. Faster and use less space due to using only verifier data(vd-test) and the opening key(op-key-test) (~1.2KiB)
 
 #### Verification with Public Parameters:
-This method is used in [ink!-based smart-contract](./slushie/usage.md) for increasing performance 
+This method is used in [ink!-based smart-contract](../slushie/usage.md) for increasing performance 
 Arguments:
 - `pp` - Serialized public parameters
 - `R` - Root hash
@@ -78,6 +108,10 @@ This function generates two random 32-bit unsigned numbers nullifier `k`, random
 #### JS Compatibility
 The function returns an array of `k`, `r`, `c`, `h`:
 [number k, number r, Uint8Array c, Uint8Array h]
+
+### Public parameters, prover data and verifier data generation
+
+Functions generate public parameters, prover data and verifier data. Mainly used for development and testing.
 
 ## Main used libraries:
 
@@ -119,14 +153,28 @@ Circuit checks that Public inputs, provided for proof generating, are equal to P
 ## WASM Build:
 For a build to wasm:
 - install [wasm-pack](https://rustwasm.github.io/wasm-pack/):
-`cargo install wasm-pack`
+```bash
+cargo install wasm-pack
+```
 - run this command:
-`wasm-pack build --features js`
+```bash
+wasm-pack build --features js
+```
+
+For build with included prover data (produced wasm will be bigger), you can run:
+```bash
+wasm-pack build --features js_include_pd
+```  
 
 ## Test:
 
 Tests take some time due to proof generation. Recommend running them in release mode with parallel feature:
-`cargo test -r --features parallel`  
+
+```bash
+cargo test --release --features parallel
+```  
 
 To run wasm tests:
-`wasm-pack test --node -r --features js`
+```bash
+wasm-pack test --node --features js --release
+```  

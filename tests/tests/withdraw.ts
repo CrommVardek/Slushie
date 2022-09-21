@@ -1,7 +1,7 @@
 import { ContractPromise } from "@polkadot/api-contract";
 import Keyring from "@polkadot/keyring";
 import { KeyringPair } from "@polkadot/keyring/types";
-import { generate_proof, generate_tree_opening } from "slushie";
+import { generate_tree_opening, generate_proof_with_pd } from "slushie";
 import { getRootHash } from "./get-root-hash";
 import { getBalance, wait } from "./utils";
 
@@ -36,7 +36,7 @@ export async function withdraw(
   let proof;
   if (!useProof) {
     // Generate proof
-    proof = generate_proof(
+    proof = generate_proof_with_pd(
       leafIndex,
       root,
       treeOpening,

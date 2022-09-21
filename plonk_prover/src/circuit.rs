@@ -6,7 +6,7 @@ use dusk_poseidon::sponge;
 use shared::functions::bytes_to_u64;
 use shared::public_types::*;
 
-pub(crate) const CIRCUIT_SIZE: usize = 1 << 16;
+pub(crate) const CIRCUIT_SIZE: usize = 1 << 15;
 
 ///Constant which should be equal during generating proof and verifying its
 pub(crate) const TRANSCRIPT_INIT: &[u8; 7] = b"slushie";
@@ -60,7 +60,7 @@ impl<const DEPTH: usize> Circuit for SlushieCircuit<DEPTH> {
 
         //Compute poseidon hash of nullifier
         let computed_nullifier_hash = sponge::gadget(composer, &[k]);
-
+       
         //Compute poseidon hash of (nullifier || randomness)
         let computed_commitment = sponge::gadget(composer, &[k, r]);
 
@@ -74,8 +74,8 @@ impl<const DEPTH: usize> Circuit for SlushieCircuit<DEPTH> {
             };
             let sister_hash = composer.append_witness(BlsScalar(bytes_to_u64(self.o.0[i])));
 
-            let left = get_left_right(composer, sister_hash, current_hash, path[i]);
-            let right = get_left_right(composer, current_hash, sister_hash, path[i]);
+            let left = composer.component_select(path[i], sister_hash, current_hash);
+            let right = composer.component_select(path[i], current_hash, sister_hash);
 
             hashes[i] = sponge::gadget(composer, &[left, right]);
         }
@@ -100,20 +100,4 @@ impl<const DEPTH: usize> Circuit for SlushieCircuit<DEPTH> {
     fn padded_gates(&self) -> usize {
         CIRCUIT_SIZE
     }
-}
-
-/// Function to get left and right hashes using path
-/// z = (x - y) * p + y
-fn get_left_right(composer: &mut TurboComposer, x: Witness, y: Witness, p: Witness) -> Witness {
-    //(x - y)
-    let sum_constraint = Constraint::new().left(1).a(x).right(-BlsScalar::one()).b(y);
-    let sum = composer.gate_add(sum_constraint);
-
-    //(x - y) * p
-    let mul_constraint = Constraint::new().mult(1).a(p).b(sum);
-    let mul = composer.gate_add(mul_constraint);
-
-    //(x - y) * p + y
-    let sum_constraint = Constraint::new().left(1).a(mul).right(1).b(y);
-    composer.gate_add(sum_constraint)
 }

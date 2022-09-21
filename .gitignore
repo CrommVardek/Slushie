@@ -4,7 +4,16 @@
 # Ignore backup files creates by cargo fmt.
 **/*.rs.bk
 
+# Ignore proof produced by cli tool.
 plonk_prover_tool/test-proof
 
+# Ignore JS files.
 node_modules
 yarn.lock
+
+# Ignore IDEs folders.
+.vscode/*
+.idea
+
+# Ignore big files
+/public-parameters/pd-test

@@ -72,7 +72,11 @@ parallel = [
 # Feature for compatibility with ink!
 ink = ["ink_storage", "scale", "ink_env", "ink_primitives"]
 
+# Feature for compatibility with js
 js = ["wasm-bindgen", "js-sys", "proof_generator"]
+
+# Feature for including prover data
+js_include_pd = ["js"]
 
 std = [
     "ink_env/std",

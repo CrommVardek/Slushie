@@ -74,7 +74,7 @@ In general, the circuit has such main constraints:
 - calculated in circuit `H(k)`, which for calculation used provided secret `k`, equals to public `h`
 - calculated in circuit `R`, which for calculation used provided secret `p(l)`, `O(l)`, `k`, `r`, equals to public `R`
 
-#### Proof verification (in progress)
+#### Proof verification
 
 Proof verification function will use `pp`, `R`, `A`, `t`, `f`. Using `pp` and Public inputs, verify proof and then return `true` in a successful case, otherwise, return `false`.
 

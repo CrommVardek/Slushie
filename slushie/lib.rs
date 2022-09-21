@@ -50,7 +50,8 @@ mod slushie {
     type PoseidonHash = [u8; 32];
 
     const SERIALIZED_VD: &[u8] = include_bytes!("../public-parameters/vd-test");
-    const SERIALIZED_OPENING_KEY: &[u8; 240] = include_bytes!("../public-parameters/op-key-test");
+    const SERIALIZED_OPENING_KEY: &[u8; 240] =
+        include_bytes!("../public-parameters/opening-key-test");
 
     #[ink(storage)]
     #[derive(ink_storage::traits::SpreadAllocate)]

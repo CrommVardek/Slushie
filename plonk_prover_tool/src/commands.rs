@@ -1,8 +1,7 @@
 use clap::Parser;
 use clap::Subcommand;
 
-use crate::actions::generate_commitment;
-use crate::actions::generate_proof;
+use crate::actions::*;
 
 /// The CLI Args struct.
 /// For the description of the params, please refer to the README.
@@ -13,10 +12,48 @@ pub struct Args {
     pub command: Commands,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Subcommand)]
 pub enum Commands {
     /// Generate nullifier, randomness and commitment
     GenerateCommitment,
+
+    /// Generate public parameters
+    GenerateTestPublicParameters {
+        /// Path to serialized Public Parameters file
+        #[clap(short, long, value_parser)]
+        output_pp: String,
+    },
+
+    /// Generate verifier data
+    GenerateVerifierData {
+        /// Path to serialized Public Parameters file
+        #[clap(short, long, value_parser)]
+        pp: String,
+
+        /// Path to serialized verifier data
+        #[clap(long, value_parser)]
+        output_vd: String,
+
+        /// Path to serialized opening key
+        #[clap(long, value_parser)]
+        output_ok: String,
+    },
+
+    /// Generate prover data
+    GenerateProverData {
+        /// Path to serialized Public Parameters file
+        #[clap(short, long, value_parser)]
+        pp: String,
+
+        /// Path to serialized prover data
+        #[clap(long, value_parser)]
+        output_pd: String,
+
+        /// Path to serialized commit key
+        #[clap(long, value_parser)]
+        output_ck: String,
+    },
 
     /// Generate Proof
     GenerateProof {
@@ -66,7 +103,10 @@ impl Commands {
     pub fn do_action(&self) {
         match self {
             Commands::GenerateCommitment => generate_commitment(),
+            Commands::GenerateTestPublicParameters { output_pp } => generate_pp(output_pp),
             args @ Commands::GenerateProof { .. } => generate_proof(args),
+            args @ Commands::GenerateVerifierData { .. } => generate_vd(args),
+            args @ Commands::GenerateProverData { .. } => generate_pd(args),
         }
     }
 }

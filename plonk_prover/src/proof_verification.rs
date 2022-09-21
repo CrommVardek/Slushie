@@ -8,7 +8,7 @@ use shared::functions::bytes_to_u64;
 use crate::circuit::*;
 use shared::public_types::*;
 
-///Verification serialized proof in cases when public parameters is available
+///Verify serialized proof in cases when public parameters is available
 ///Depth can be custom
 #[allow(non_snake_case)]
 pub fn verify<const DEPTH: usize>(
@@ -50,7 +50,7 @@ pub fn verify<const DEPTH: usize>(
     SlushieCircuit::<DEPTH>::verify(&pp, &vd, &proof, &public_inputs, TRANSCRIPT_INIT)
 }
 
-///Verification serialized proof in cases when public parameters is too large
+///Verify serialized proof in cases when public parameters is too large
 ///Only default tree depth
 #[allow(clippy::too_many_arguments)]
 #[allow(non_snake_case)]

@@ -14,7 +14,10 @@ pub mod merkle_tree;
 extern crate alloc;
 
 #[cfg(all(feature = "proof_generator", not(feature = "js")))]
-pub use proof_generation::prove;
+pub mod public_parameters_generation;
+
+#[cfg(all(feature = "proof_generator", not(feature = "js")))]
+pub use proof_generation::{prove, prove_with_vd};
 
 #[cfg(all(feature = "proof_generator", not(feature = "js")))]
 pub use utils::index_to_path;
@@ -44,7 +47,7 @@ mod tests {
     use shared::public_types::*;
 
     use crate::circuit::*;
-    use crate::proof_generation::prove;
+    use crate::proof_generation::{prove, prove_with_vd};
     use crate::utils::index_to_path;
 
     use super::*;
@@ -194,24 +197,11 @@ mod tests {
     }
 
     ///Setup function for every test
-    fn setup<'a, const DEPTH: usize>(
+    pub fn setup<const DEPTH: usize>(
         k: u32,
         r: u32,
         l: usize,
-    ) -> (
-        &'a [u8],
-        &'a [u8],
-        &'a [u8; OpeningKey::SIZE],
-        PoseidonHash,
-        [PoseidonHash; DEPTH],
-    ) {
-        //Setup public parameters from file to reduce tests time
-        let pp = include_bytes!("../../public-parameters/pp-test");
-
-        // Setup verifier data and opening key from file
-        let vd = include_bytes!("../../public-parameters/vd-test");
-        let opening_key = include_bytes!("../../public-parameters/op-key-test");
-
+    ) -> (PoseidonHash, [PoseidonHash; DEPTH]) {
         //Calculate commitment
         let commitment = sponge::hash(&[(k as u64).into(), (r as u64).into()]);
 
@@ -219,7 +209,7 @@ mod tests {
         let (R, o) = get_opening(l, commitment);
 
         // Return public parameters, verifier data, root hash and opening
-        (pp, vd, opening_key, R, o)
+        (R, o)
     }
 
     ///Get random opening and root for its
@@ -258,9 +248,18 @@ mod tests {
         (u64_to_bytes(last_hash.0), opening)
     }
 
+    //Setup public parameters from file to reduce tests time
+    pub const PP: &[u8] = include_bytes!("../../public-parameters/pp-test");
+    pub const VD: &[u8] = include_bytes!("../../public-parameters/vd-test");
+    pub const OPENING_KEY: &[u8; OpeningKey::SIZE] =
+        include_bytes!("../../public-parameters/opening-key-test");
+    pub const PD: &[u8] = include_bytes!("../../public-parameters/pd-test");
+    pub const COMMIT_KEY: &[u8] = include_bytes!("../../public-parameters/commit-key-test");
+
     ///Set constant PAYOUT and RELAYER address
-    const PAYOUT: Pubkey = hex!("38c4c4c0f0e9de905b304b60f3ab77b47e2f6b4a388b7859373c6e6a1581708a");
-    const RELAYER: Pubkey =
+    pub const PAYOUT: Pubkey =
+        hex!("38c4c4c0f0e9de905b304b60f3ab77b47e2f6b4a388b7859373c6e6a1581708a");
+    pub const RELAYER: Pubkey =
         hex!("92fba99dfb7832c4268e299efb9cd3aaad7153bbee9974729340b528d276936e");
 
     ///Depth which is used in Slushie mixer contract
@@ -277,16 +276,16 @@ mod tests {
 
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
-        let l = rand::random::<u32>() as usize;
+        let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, _vd, _opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove(PP, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
+        verify::<DEPTH>(PP, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
     }
 
     ///Test for checking circuit works with random arguments
@@ -300,16 +299,15 @@ mod tests {
         let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove_with_vd(PD, COMMIT_KEY, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
         verify_with_vd(
-            vd,
-            opening_key,
+            VD,
+            OPENING_KEY,
             scalar_to_bytes(h),
             R,
             PAYOUT,
@@ -331,26 +329,13 @@ mod tests {
         let l = 8;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove(PP, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof)
-            .or_else(|_| {
-                verify_with_vd(
-                    vd,
-                    opening_key,
-                    scalar_to_bytes(h),
-                    R,
-                    PAYOUT,
-                    RELAYER,
-                    f,
-                    proof,
-                )
-            })
-            .expect("ProofVerificationError");
+        verify::<DEPTH>(PP, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
     }
 
     ///Test for checking circuit works with wrong fee
@@ -360,17 +345,18 @@ mod tests {
         const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
-        let l = rand::random::<u8>() as usize;
+        let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove_with_vd(PD, COMMIT_KEY, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(
-            pp,
+        verify_with_vd(
+            VD,
+            OPENING_KEY,
             scalar_to_bytes(h),
             R,
             PAYOUT,
@@ -379,19 +365,6 @@ mod tests {
             f + 1,
             proof,
         )
-        .or_else(|_| {
-            verify_with_vd(
-                vd,
-                opening_key,
-                scalar_to_bytes(h),
-                R,
-                PAYOUT,
-                RELAYER,
-                // Fee is incorrect
-                f + 1,
-                proof,
-            )
-        })
         .expect("ProofVerificationError");
     }
 
@@ -402,15 +375,16 @@ mod tests {
         const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
-        let l = rand::random::<u8>() as usize;
+        let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove_with_vd(PD, COMMIT_KEY, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
-        verify::<DEPTH>(
-            pp,
+        verify_with_vd(
+            VD,
+            OPENING_KEY,
             // Nullifier hash in public inputs is incorrect
             scalar_to_bytes(BlsScalar::zero()),
             R,
@@ -419,19 +393,6 @@ mod tests {
             f,
             proof,
         )
-        .or_else(|_| {
-            verify_with_vd(
-                vd,
-                opening_key,
-                // Nullifier hash in public inputs is incorrect
-                scalar_to_bytes(BlsScalar::zero()),
-                R,
-                PAYOUT,
-                RELAYER,
-                f,
-                proof,
-            )
-        })
         .expect("ProofVerificationError");
     }
 
@@ -445,14 +406,15 @@ mod tests {
         let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove_with_vd(PD, COMMIT_KEY, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(
-            pp,
+        verify_with_vd(
+            VD,
+            OPENING_KEY,
             scalar_to_bytes(h),
             R,
             PAYOUT,
@@ -461,19 +423,6 @@ mod tests {
             f,
             proof,
         )
-        .or_else(|_| {
-            verify_with_vd(
-                vd,
-                opening_key,
-                scalar_to_bytes(h),
-                R,
-                PAYOUT,
-                // Relayer in public inputs is incorrect
-                PAYOUT,
-                f,
-                proof,
-            )
-        })
         .expect("ProofVerificationError");
     }
 
@@ -487,14 +436,15 @@ mod tests {
         let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove_with_vd(PD, COMMIT_KEY, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(
-            pp,
+        verify_with_vd(
+            VD,
+            OPENING_KEY,
             scalar_to_bytes(h),
             R,
             // Payout in public inputs is incorrect
@@ -503,19 +453,6 @@ mod tests {
             f,
             proof,
         )
-        .or_else(|_| {
-            verify_with_vd(
-                vd,
-                opening_key,
-                scalar_to_bytes(h),
-                R,
-                // Payout in public inputs is incorrect
-                RELAYER,
-                RELAYER,
-                f,
-                proof,
-            )
-        })
         .expect("ProofVerificationError");
     }
 
@@ -526,17 +463,18 @@ mod tests {
         const DEPTH: usize = DEFAULT_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
-        let l = rand::random::<u8>() as usize;
+        let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, o) = setup::<DEPTH>(k, r, l);
+        let (R, o) = setup::<DEPTH>(k, r, l);
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove_with_vd(PD, COMMIT_KEY, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(
-            pp,
+        verify_with_vd(
+            VD,
+            OPENING_KEY,
             scalar_to_bytes(h),
             // Root in public inputs is incorrect
             [0; 32],
@@ -545,19 +483,6 @@ mod tests {
             f,
             proof,
         )
-        .or_else(|_| {
-            verify_with_vd(
-                vd,
-                opening_key,
-                scalar_to_bytes(h),
-                // Root in public inputs is incorrect
-                [0; 32],
-                PAYOUT,
-                RELAYER,
-                f,
-                proof,
-            )
-        })
         .expect("ProofVerificationError");
     }
 
@@ -565,34 +490,23 @@ mod tests {
     #[test]
     #[should_panic = "ProofVerificationError"]
     fn wrong_opening_with_small_depth() {
-        const DEPTH: usize = 4;
+        const DEPTH: usize = 2;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
-        let l = 10usize;
+        let l = 1usize;
         let f = rand::random::<u64>();
 
-        let (pp, vd, opening_key, R, mut o) = setup::<DEPTH>(k, r, l);
+        let (R, mut o) = setup::<DEPTH>(k, r, l);
 
         // Opening is incorrect
         o[1] = [0; 32];
 
-        let proof = &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
+        let proof = &prove(PP, l, R, o, k, r, PAYOUT, RELAYER, f).unwrap();
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof)
+        verify::<DEPTH>(PP, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof)
             .expect("ProofVerificationError");
-        verify_with_vd(
-            vd,
-            opening_key,
-            scalar_to_bytes(h),
-            R,
-            PAYOUT,
-            RELAYER,
-            f,
-            proof,
-        )
-        .expect("ProofVerificationError");
     }
 
     ///Test for checking circuit works with wrong opening
@@ -602,10 +516,10 @@ mod tests {
         const DEPTH: usize = MAX_DEPTH;
         let k = rand::random::<u32>();
         let r = rand::random::<u32>();
-        let l = rand::random::<u32>() as usize;
+        let l = rand::random::<u16>() as usize;
         let f = rand::random::<u64>();
 
-        let (pp, _vd, _opening_key, R, mut o) = setup::<DEPTH>(k, r, l);
+        let (R, mut o) = setup::<DEPTH>(k, r, l);
 
         // Opening is incorrect
         o[10] = [0; 32];
@@ -614,10 +528,10 @@ mod tests {
         // but ProofVerificationError will be in result. To decrease tests time we use
         // PolynomialDegreeTooLarge error during generating proof with incorrect data
         let proof =
-            &prove(pp, l, R, o, k, r, PAYOUT, RELAYER, f).expect("PolynomialDegreeTooLarge");
+            &prove(PP, l, R, o, k, r, PAYOUT, RELAYER, f).expect("PolynomialDegreeTooLarge");
 
         let h = sponge::hash(&[(k as u64).into()]);
 
-        verify::<DEPTH>(pp, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
+        verify::<DEPTH>(PP, scalar_to_bytes(h), R, PAYOUT, RELAYER, f, proof).unwrap();
     }
 }

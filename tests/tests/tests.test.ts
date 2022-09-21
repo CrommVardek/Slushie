@@ -7,6 +7,7 @@ import { deposit } from "./deposit";
 
 import { KeyringPair } from "@polkadot/keyring/types";
 import { withdraw } from "./withdraw";
+import {wait} from "./utils";
 
 // Set test timeout due to long proof generation
 jest.setTimeout(350000);
@@ -49,7 +50,10 @@ describe("Deposits", () => {
 });
 
 describe("Withdraws with wrong inputs", () => {
-  test.failing("Withdraw with wrong nullifiers hash", async () => {
+  test.concurrent.failing("Withdraw with wrong nullifiers hash", async () => {
+    // Wait some time for sending deposits
+    await wait(5000);
+
     // Change nullifier hash
     const wrongNullifierHash = new Uint8Array([...Array(32).keys()]);
 
@@ -66,7 +70,10 @@ describe("Withdraws with wrong inputs", () => {
       keyring
     );
   });
-  test.failing("Withdraw with wrong randomness", async () => {
+  test.concurrent.failing("Withdraw with wrong randomness", async () => {
+    // Wait some time for sending deposits
+    await wait(5000);
+
     await withdraw(
       contract,
       alice,
@@ -81,7 +88,10 @@ describe("Withdraws with wrong inputs", () => {
     );
   });
 
-  test.failing("Withdraw with wrong nullifier", async () => {
+  test.concurrent.failing("Withdraw with wrong nullifier", async () => {
+    // Wait some time for sending deposits
+    await wait(5000);
+
     await withdraw(
       contract,
       alice,
@@ -96,7 +106,10 @@ describe("Withdraws with wrong inputs", () => {
     );
   });
 
-  test.failing("Withdraw with wrong commitments", async () => {
+  test.concurrent.failing("Withdraw with wrong commitments", async () => {
+    // Wait some time for sending deposits
+    await wait(5000);
+
     // Change commitments
     const wrongCommitments = [...commitments];
     wrongCommitments[1] = new Uint8Array([...Array(32).keys()]);
@@ -120,6 +133,7 @@ describe("Withdraws", () => {
   let usedProof: Uint8Array;
 
   test("Withdraw second", async () => {
+
     usedProof = await withdrawTest(1);
   });
 
